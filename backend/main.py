@@ -7,6 +7,7 @@ trading signal using Structured Outputs (JSON schema enforcement).
 """
 
 import os
+import time
 import traceback
 from datetime import datetime, timezone
 from enum import Enum
@@ -25,7 +26,28 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06")
 
-app = FastAPI(title="MT5 XAUUSD AI Signal", version="1.0.0")
+app = FastAPI(title="GoldMind AI Signal Backend", version="1.0.0")
+
+
+# ---------------------------------------------------------------------------
+# Startup event — show config banner
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+async def startup_banner():
+    key_preview = OPENAI_API_KEY[:8] + "..." + OPENAI_API_KEY[-4:] if len(OPENAI_API_KEY) > 12 else "NOT SET"
+    print("")
+    print("=" * 60)
+    print("  🤖 GoldMind AI Signal Backend")
+    print("=" * 60)
+    print(f"  Model:    {OPENAI_MODEL}")
+    print(f"  API Key:  {key_preview}")
+    print(f"  Server:   http://127.0.0.1:8000")
+    print(f"  Health:   http://127.0.0.1:8000/health")
+    print(f"  Signal:   http://127.0.0.1:8000/signal  (POST)")
+    print("=" * 60)
+    print("  Waiting for signal requests from MT5 EA...")
+    print("=" * 60)
+    print("")
 
 # ---------------------------------------------------------------------------
 # Pydantic models — Request
@@ -246,16 +268,29 @@ async def health():
 
 @app.post("/signal", response_model=SignalResponse)
 async def generate_signal(req: SignalRequest):
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    print(f"\n{'─' * 60}")
+    print(f"📥 [{now}] Signal request received")
+    print(f"   Symbol: {req.symbol}  Timeframe: {req.timeframe}")
+    print(f"   Bid: {req.bid}  Ask: {req.ask}  Spread: {req.spread_points}pts")
+    print(f"   Candles: {len(req.candles)}  ATR: {req.atr}")
+    print(f"   Model: {OPENAI_MODEL}")
+
     # 1. Compute ATR if not provided
     atr_value = req.atr if req.atr is not None else compute_atr(req.candles)
 
     # 2. Quick spread veto (server-side too, belt-and-suspenders)
     if req.spread_points > req.constraints.max_spread_points:
+        print(f"   🚫 VETO: Spread {req.spread_points} > max {req.constraints.max_spread_points}")
+        print(f"{'─' * 60}")
         return veto_response(req.symbol, f"spread {req.spread_points} > max {req.constraints.max_spread_points}")
 
     # 3. Call OpenAI with Structured Outputs
     try:
         client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
+
+        print(f"   ⏳ Calling OpenAI ({OPENAI_MODEL})...")
+        start_time = time.time()
 
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -269,16 +304,36 @@ async def generate_signal(req: SignalRequest):
             },
         )
 
+        elapsed = time.time() - start_time
+
+        # Token usage
+        usage = response.usage
+        if usage:
+            print(f"   📊 Tokens: {usage.prompt_tokens} in + {usage.completion_tokens} out = {usage.total_tokens} total")
+        print(f"   ⏱️  Response time: {elapsed:.1f}s")
+
         # Extract the text output from the response
         raw_json = response.choices[0].message.content
 
         # Parse into our Pydantic model for validation
         signal = SignalResponse.model_validate_json(raw_json)
+
+        # Log the result
+        if signal.veto:
+            print(f"   🚫 VETO: {signal.veto_reason}")
+        else:
+            print(f"   ✅ Signal: {signal.bias.value.upper()} (confidence: {signal.confidence:.0%})")
+            print(f"   📋 Order: {signal.order.type.value}")
+            print(f"      Entry: {signal.order.entry}  SL: {signal.order.sl}  TP: {signal.order.tp}")
+            print(f"      Comment: {signal.order.comment}")
+        print(f"{'─' * 60}")
+
         return signal
 
     except Exception as e:
-        print(f"[ERROR] OpenAI call failed: {e}")
+        print(f"   ❌ ERROR: {e}")
         traceback.print_exc()
+        print(f"{'─' * 60}")
         return veto_response(req.symbol, "model_unavailable")
 
 
