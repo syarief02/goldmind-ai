@@ -425,11 +425,11 @@ After you restart your computer, you need to start two things:
 2. The EA will automatically try again at the next signal refresh
 3. If it keeps happening, your broker may have large minimum distance requirements
 
-### Problem: "Calculated lot size <= 0"
-**What it means:** Your account balance is too low for the risk settings, or the stop loss distance is very large.
-**How to fix:**
-1. Increase `RiskPercent` (e.g., from 1.0 to 2.0)
-2. Or deposit more funds into your account
+### Problem: "Using minimum lot" warning
+**What it means:** Your account balance is small relative to the SL distance, so the EA is using the broker's minimum lot size (usually 0.01). Your actual risk per trade may be higher than the configured `RiskPercent`.
+**How to fix:** This is actually working correctly! The EA tells you exactly how much you're risking in dollars and as a % of balance. If the risk is too high for your comfort:
+1. Deposit more funds into your account
+2. Or accept the higher risk — it's the smallest possible trade your broker allows
 
 ### Problem: Server terminal shows "openai.AuthenticationError"
 **What it means:** Your API key is invalid or expired.
@@ -519,5 +519,3 @@ goldmind-ai/
 *Built with ❤️ by Syarief Azman using FastAPI, OpenAI Structured Outputs, and MQL5*
 
 *For support, contact: [t.me/syariefazman](https://t.me/syariefazman)*
-
-

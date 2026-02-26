@@ -393,6 +393,9 @@ void RequestAndPlace()
       Print("ERROR: WebRequest failed, code=", err);
       if(err == 4014)
          Print(">>> You must add '", InpBackendURL, "' to Tools -> Options -> Expert Advisors -> Allow WebRequest.");
+      g_lastRequestFailed = true;
+      g_lastSignalTime = TimeCurrent();
+      SaveState();
       return;
      }
 
@@ -403,6 +406,9 @@ void RequestAndPlace()
    if(httpCode != 200)
      {
       Print("ERROR: Backend returned HTTP ", httpCode);
+      g_lastRequestFailed = true;
+      g_lastSignalTime = TimeCurrent();
+      SaveState();
       return;
      }
 
