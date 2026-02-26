@@ -209,15 +209,16 @@ Your settings should look like this:
 
 ## 📊 Step 5: Attach the EA to a Chart
 
+> ⚠️ **IMPORTANT: XAUUSD ONLY!** This EA must be attached to a **XAUUSD** (gold) chart. The AI is specifically trained to analyze gold price action. If you attach it to a different symbol (e.g., EURUSD, GBPJPY), it will send that symbol's data but the AI will still analyze it as if it's gold — **this will produce bad signals!**
+
 ### Open a XAUUSD chart:
 1. In MetaTrader 5, look at the **Market Watch** panel on the left (press **Ctrl+M** if you don't see it)
-2. Find **XAUUSD** in the list
+2. Find **XAUUSD** in the list (your broker may label it as **GOLD**, **XAUUSDm**, or similar — any gold pair works)
 3. Right-click on **XAUUSD** → click **Chart Window**
 4. A new chart will open
 
-### Change to M15 timeframe:
-1. Look at the toolbar at the top of the chart
-2. Click **M15** (15 minutes) — this matches the EA's default setting
+### Chart timeframe (any is fine):
+The chart timeframe **does not matter**. The EA uses its own `Timeframe` input setting (default: M15) to pull candle data, regardless of what timeframe the chart is displaying. You can leave the chart on any timeframe you personally prefer for viewing.
 
 ### Attach the EA:
 1. Press **Ctrl+N** to open the **Navigator** panel (on the left side)
@@ -281,7 +282,7 @@ When you attach the EA, you can change these settings in the **Inputs** tab:
 | **MaxSpreadPoints** | `50` | If the spread is wider than this, no trade will be placed. Lower = safer but fewer trades |
 | **RiskPercent** | `1.0` | How much of your account to risk per trade. 1.0 = 1%. Higher = bigger trades but more risk |
 | **MinRR** | `1.5` | Minimum reward-to-risk ratio. 1.5 means the target profit must be 1.5× bigger than the stop loss |
-| **Timeframe** | `M15` | Must match the chart timeframe. If your chart is M15, this should be M15 |
+| **Timeframe** | `M15` | Which candle data to analyze. The EA pulls this timeframe's candles regardless of what chart timeframe you're viewing. M15 is recommended for XAUUSD |
 | **CandleCount** | `200` | How many candles to send to ChatGPT. More = better analysis but slower |
 | **RefreshHours** | `4` | How often to cancel old orders and get new signals |
 | **MagicNumber** | `20250226` | A unique ID for this EA's orders. Only change if running multiple EAs |
@@ -404,7 +405,7 @@ A: Each signal request costs about $0.01–$0.05 in OpenAI API usage. With signa
 A: Yes! Run the Python server and MT5 on the same VPS. Change `BackendURL` if they're on different machines.
 
 **Q: Can I use this on other symbols besides XAUUSD?**
-A: It's designed for XAUUSD, but you could try other symbols by changing the chart. The AI prompt is gold-focused though, so results may vary.
+A: **No — only attach this EA to a XAUUSD (gold) chart.** The AI prompt is specifically designed to analyze gold price action. If you attach it to another symbol (e.g., EURUSD), the EA will send that symbol's data but the AI will still analyze it as gold, producing unreliable signals. To support other symbols, the backend prompt would need to be modified.
 
 **Q: Do I need to keep my computer on 24/7?**
 A: Yes, both the server and MT5 need to be running for the EA to work. A VPS is recommended for 24/7 operation.
