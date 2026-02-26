@@ -167,13 +167,13 @@ You need to copy two files into your MT5 installation folder.
 ### Copy the JSON parser file:
 1. In the `MQL5` folder, open the `Include` subfolder
 2. Copy the file from your project:
-   - **From:** `c:\Users\User\OneDrive\Desktop\mt5 xauusd\mt5\Include\JASONNode.mqh`
+   - **From:** your project's `mt5\Include\JASONNode.mqh`
    - **To:** the `MQL5\Include\` folder you just opened
    
 ### Copy the EA file:
 1. Go back to the `MQL5` folder, open the `Experts` subfolder
 2. Copy the file from your project:
-   - **From:** `c:\Users\User\OneDrive\Desktop\mt5 xauusd\mt5\Experts\GoldMind_AI.mq5`
+   - **From:** your project's `mt5\Experts\GoldMind_AI.mq5`
    - **To:** the `MQL5\Experts\` folder you just opened
 
 ### Compile the EA:
