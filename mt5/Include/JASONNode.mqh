@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
 //|                                                   JASONNode.mqh  |
 //|                        Minimal JSON Parser for MQL5              |
-//|                        For use with XAUUSD AI Signal EA          |
+//|                        For use with GoldMind AI EA               |
 //+------------------------------------------------------------------+
-#property copyright "XAUUSD AI Signal"
+#property copyright "GoldMind AI"
 #property strict
 
 //+------------------------------------------------------------------+

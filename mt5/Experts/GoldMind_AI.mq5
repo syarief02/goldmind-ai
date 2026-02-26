@@ -1,12 +1,12 @@
 //+------------------------------------------------------------------+
-//|                                          XAUUSD_AI_Signal.mq5    |
+//|                                             GoldMind_AI.mq5      |
 //|                        AI-Powered Breakout Signal EA              |
 //|                        Calls FastAPI backend for signals          |
 //+------------------------------------------------------------------+
-#property copyright   "XAUUSD AI Signal"
+#property copyright   "GoldMind AI"
 #property link        ""
 #property version     "1.00"
-#property description "Requests AI trading signals from a FastAPI backend and places pending orders on XAUUSD."
+#property description "GoldMind AI — AI-powered breakout signals for XAUUSD via FastAPI + OpenAI."
 #property strict
 
 //--- Include our JSON parser
@@ -34,7 +34,7 @@ input int      InpTimeout          = 10000;    // WebRequest timeout ms
 CTrade         trade;                 // Trade helper
 datetime       g_lastSignalTime = 0;  // When last signal was requested
 ulong          g_pendingTicket  = 0;  // Current pending order ticket
-string         GV_PREFIX        = "XAUUSD_AI_"; // GlobalVariable prefix
+string         GV_PREFIX        = "GoldMind_"; // GlobalVariable prefix
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
@@ -59,7 +59,7 @@ int OnInit()
    if(GlobalVariableCheck(gvTime))
       g_lastSignalTime = (datetime)(long)GlobalVariableGet(gvTime);
 
-   Print("=== XAUUSD AI Signal EA initialized ===");
+   Print("=== GoldMind AI initialized ===");
    Print("Backend URL: ", InpBackendURL);
    Print("Restored ticket: ", g_pendingTicket, "  Last signal: ", TimeToString(g_lastSignalTime));
 
@@ -76,7 +76,7 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    SaveState();
-   Print("=== XAUUSD AI Signal EA removed ===");
+   Print("=== GoldMind AI removed ===");
 }
 
 //+------------------------------------------------------------------+

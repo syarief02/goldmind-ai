@@ -1,4 +1,4 @@
-# 🤖 MT5 XAUUSD AI Signal Trading System
+# 🤖 MT5 GoldMind AI Trading System
 
 > **What is this?** This is a tool that uses AI (ChatGPT) to analyze gold (XAUUSD) price charts and automatically place trades for you in MetaTrader 5. It runs on your own computer — you just need to start two things: a small Python server and the EA in MT5.
 
@@ -172,12 +172,12 @@ You need to copy two files into your MT5 installation folder.
 ### Copy the EA file:
 1. Go back to the `MQL5` folder, open the `Experts` subfolder
 2. Copy the file from your project:
-   - **From:** `c:\Users\User\OneDrive\Desktop\mt5 xauusd\mt5\Experts\XAUUSD_AI_Signal.mq5`
+   - **From:** `c:\Users\User\OneDrive\Desktop\mt5 xauusd\mt5\Experts\GoldMind_AI.mq5`
    - **To:** the `MQL5\Experts\` folder you just opened
 
 ### Compile the EA:
 1. In MetaTrader 5, press **F4** on your keyboard — this opens **MetaEditor**
-2. In MetaEditor, press **Ctrl+O** (Open) and navigate to `MQL5\Experts\XAUUSD_AI_Signal.mq5`
+2. In MetaEditor, press **Ctrl+O** (Open) and navigate to `MQL5\Experts\GoldMind_AI.mq5`
 3. Press **F7** (or click the **Compile** button) to compile
 4. At the bottom, you should see: **`0 errors, 0 warnings`**
 5. Close MetaEditor and go back to MetaTrader 5
@@ -222,7 +222,7 @@ Your settings should look like this:
 ### Attach the EA:
 1. Press **Ctrl+N** to open the **Navigator** panel (on the left side)
 2. Expand **Expert Advisors** (click the + or triangle next to it)
-3. You should see **XAUUSD_AI_Signal**
+3. You should see **GoldMind_AI**
 4. **Drag it** onto your XAUUSD chart (or double-click it)
 5. A dialog box will appear with settings:
 
@@ -249,7 +249,7 @@ Look at the top toolbar of MT5. You should see a button that says **"Algo Tradin
 2. You should see messages like:
 
 ```
-=== XAUUSD AI Signal EA initialized ===
+=== GoldMind AI EA initialized ===
 Backend URL: http://localhost:8000/signal
 >>> No pending order found, requesting new signal...
 Sending signal request to: http://localhost:8000/signal
@@ -430,7 +430,7 @@ mt5 xauusd/
 │   ├── Include/
 │   │   └── JASONNode.mqh           ← JSON parser (copy to MQL5\Include\)
 │   └── Experts/
-│       └── XAUUSD_AI_Signal.mq5    ← The EA (copy to MQL5\Experts\)
+│       └── GoldMind_AI.mq5    ← The EA (copy to MQL5\Experts\)
 ├── .gitignore                      ← Prevents .env from being uploaded
 └── README.md                       ← This file you're reading
 ```
@@ -448,3 +448,4 @@ mt5 xauusd/
 ---
 
 *Built with ❤️ using FastAPI, OpenAI Structured Outputs, and MQL5*
+
