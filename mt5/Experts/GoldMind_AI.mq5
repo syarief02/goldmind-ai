@@ -34,6 +34,7 @@ input int      InpTimeout          = 10000;    // WebRequest timeout ms
 CTrade         trade;                 // Trade helper
 datetime       g_lastSignalTime = 0;  // When last signal was requested
 ulong          g_pendingTicket  = 0;  // Current pending order ticket
+bool           g_lastRequestFailed = false; // Was the last request a failure?
 string         GV_PREFIX        = "GoldMind_"; // GlobalVariable prefix
 
 //+------------------------------------------------------------------+
@@ -131,6 +132,10 @@ void OnTimer()
    //--- Calculate seconds since last signal
    long elapsed = (long)(now - g_lastSignalTime);
    long refreshSec = InpRefreshHours * 3600;
+   long retrySec   = 15 * 60;  // 15-minute retry on failure
+
+   //--- Use shorter cooldown if last request failed (e.g. no internet)
+   long cooldownSec = g_lastRequestFailed ? retrySec : refreshSec;
 
    //--- Case 1: We have a pending order but it's time to refresh
    if(hasPending && elapsed >= refreshSec)
@@ -144,16 +149,17 @@ void OnTimer()
    //--- Case 2: No pending order and no position
    if(!hasPending)
    {
-      //--- Only request if 4 hours have passed since last request (or first run)
-      if(g_lastSignalTime > 0 && elapsed < refreshSec)
+      //--- Only request if cooldown has passed (or first run)
+      if(g_lastSignalTime > 0 && elapsed < cooldownSec)
       {
          //--- Still within cooldown window, wait
-         long remaining = refreshSec - elapsed;
+         long remaining = cooldownSec - elapsed;
          long mins = remaining / 60;
          static datetime lastLogTime = 0;
          if(now - lastLogTime >= 300) // Log every 5 minutes to avoid spam
          {
-            Print(">>> Waiting for next signal window... ", mins, " minutes remaining");
+            string mode = g_lastRequestFailed ? "retry" : "signal";
+            Print(">>> Waiting for next ", mode, " window... ", mins, " minutes remaining");
             lastLogTime = now;
          }
          return;
@@ -406,10 +412,16 @@ void RequestAndPlace()
    if(veto)
    {
       Print(">>> Signal vetoed: ", vetoReason);
+      g_lastRequestFailed = (vetoReason == "model_unavailable");
+      if(g_lastRequestFailed)
+         Print(">>> Will retry in 15 minutes (server/API issue)");
       g_lastSignalTime = TimeCurrent();
       SaveState();
       return;
    }
+
+   //--- If we got here, request succeeded
+   g_lastRequestFailed = false;
 
    //--- Get order details
    JASONNode *orderNode = json.FindKey("order");
