@@ -661,13 +661,19 @@ double CalculateLotSize(double entry, double sl)
      }
 
 // Raw lots
-   double lots = riskAmt / riskPerLot;
+   double rawLots = riskAmt / riskPerLot;
 
 // Round DOWN to nearest lot step
-   lots = MathFloor(lots / lotStep) * lotStep;
+   double lots = MathFloor(rawLots / lotStep) * lotStep;
 
-// Clamp to broker limits
-   lots = MathMax(lots, lotMin);
+// Clamp to broker limits — use minimum lot if calculated is too small
+   if(lots < lotMin)
+     {
+      Print(">>> NOTE: Calculated lot ", DoubleToString(rawLots, 4), " < broker min ", DoubleToString(lotMin, 2), " — using minimum lot");
+      double actualRisk = lotMin * slTicks * tickValue;
+      Print(">>> Actual risk with min lot: $", DoubleToString(actualRisk, 2), " (", DoubleToString(actualRisk / balance * 100, 1), "% of balance)");
+      lots = lotMin;
+     }
    lots = MathMin(lots, lotMax);
 
 // Normalize
