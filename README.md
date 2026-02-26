@@ -31,7 +31,7 @@ YOU START THE SERVER         THE EA IN MT5              OPENAI (CHATGPT)
 on your computer             runs on XAUUSD chart       analyzes the market
         │                           │                          │
         │    1. EA sends price      │                          │
-        │    data every few mins    │                          │
+        │    data every 4 hours     │                          │
         │◄──────────────────────────│                          │
         │                           │                          │
         │    2. Server forwards     │                          │
@@ -315,6 +315,7 @@ Order: type=buy_stop entry=5205.18 SL=5191.08 TP=5220.68
 - **If 4 hours pass and it hasn't triggered** → the EA cancels it and asks for a new signal
 - **If the AI says "don't trade"** → the EA logs "Signal vetoed" and waits 4 hours before trying again
 - **If the safety filter rejects the trade** (bad R:R, spread too wide, etc.) → the EA waits 4 hours before the next request
+- **If the server/API fails** (no internet, API error) → the EA retries in **15 minutes** instead of waiting the full 4 hours
 
 ---
 
@@ -405,12 +406,13 @@ After you restart your computer, you need to start two things:
 3. Make sure you have credits on your OpenAI account
 
 ### Problem: "Signal vetoed: model_unavailable"
-**What it means:** ChatGPT couldn't be reached.
+**What it means:** ChatGPT couldn't be reached (no internet or API issue).
 **How to fix:**
 1. Check your internet connection
 2. Verify your API key at https://platform.openai.com/api-keys
 3. Check if you have credits at https://platform.openai.com/settings/organization/billing/overview
 4. Check the server terminal for detailed error messages
+5. The EA will **automatically retry in 15 minutes** — no manual action needed
 
 ### Problem: "REJECTED: Spread 80 > max 50"
 **What it means:** The market spread is too wide right now. This is normal during news events or low-liquidity hours.
