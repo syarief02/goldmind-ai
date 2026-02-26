@@ -257,22 +257,20 @@ async def generate_signal(req: SignalRequest):
     try:
         client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
 
-        response = client.responses.create(
+        response = client.chat.completions.create(
             model=OPENAI_MODEL,
-            input=[
+            messages=[
                 {"role": "system", "content": build_system_prompt(req, atr_value)},
                 {"role": "user", "content": build_user_message(req)},
             ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "json_schema": SIGNAL_JSON_SCHEMA,
-                }
+            response_format={
+                "type": "json_schema",
+                "json_schema": SIGNAL_JSON_SCHEMA,
             },
         )
 
         # Extract the text output from the response
-        raw_json = response.output_text
+        raw_json = response.choices[0].message.content
 
         # Parse into our Pydantic model for validation
         signal = SignalResponse.model_validate_json(raw_json)
