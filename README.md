@@ -59,6 +59,49 @@ on your computer             runs on XAUUSD chart       analyzes the market
 - After 4 hours, if the pending order hasn't been triggered, the EA cancels it and asks for a fresh signal
 - If the EA already has an open position, it **skips** the request entirely to save API costs
 
+### 🧠 How the AI Analysis Works
+
+The server sends **two things** to OpenAI:
+
+**1. A set of rules** telling the AI how to behave:
+- "You are a professional XAUUSD trading analyst"
+- Use ATR (volatility indicator) to set price buffers
+- Propose breakout-style pending orders only
+- Entry must be above Ask (for buys) or below Bid (for sells)
+- Stop loss and take profit must respect minimum risk-reward ratio
+- If no clear setup exists, veto (don't trade)
+
+**2. The latest market data** from MT5:
+- Last 50 candles (open, high, low, close, volume for each)
+- Current bid/ask prices and spread
+- ATR value (measures how much the price typically moves)
+
+**What comes back** — a structured JSON response:
+```json
+{
+  "bias": "bullish",
+  "confidence": 0.72,
+  "order": {
+    "type": "buy_stop",
+    "entry": 5205.18,
+    "sl": 5191.08,
+    "tp": 5220.68,
+    "comment": "bullish breakout potential"
+  },
+  "veto": false
+}
+```
+
+The EA then runs this through **6 safety filters** before placing any order:
+1. ✅ Spread check — is the spread reasonable?
+2. ✅ Stop level check — does the broker allow this entry distance?
+3. ✅ Entry price validation — is entry above/below current price?
+4. ✅ SL direction check — is the stop loss on the correct side?
+5. ✅ Risk-reward ratio — is the potential profit worth the risk?
+6. ✅ Lot size calculation — how much to risk based on your account balance?
+
+Only if **all 6 filters pass** will the EA place the pending order.
+
 ---
 
 ## 📋 What You Need Before Starting
