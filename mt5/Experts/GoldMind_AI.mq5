@@ -37,10 +37,34 @@ ulong          g_pendingTicket  = 0;  // Current pending order ticket
 string         GV_PREFIX        = "GoldMind_"; // GlobalVariable prefix
 
 //+------------------------------------------------------------------+
+//| LICENSE EXPIRATION — Change the date below to extend the license  |
+//| Format: D'YYYY.MM.DD HH:MM:SS'                                   |
+//+------------------------------------------------------------------+
+datetime       LICENSE_EXPIRY = D'2026.03.31 23:59:59';   // <── EDIT THIS DATE TO EXTEND
+
+//+------------------------------------------------------------------+
 //| Expert initialization                                             |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   //=== LICENSE CHECK ===
+   datetime now = TimeCurrent();
+   if(now >= LICENSE_EXPIRY)
+   {
+      MessageBox(
+         "GoldMind AI license has expired.\n\n"
+         "Please contact Syarief Azman on Telegram\n"
+         "for authorization and a new license:\n\n"
+         "https://t.me/syariefazman",
+         "GoldMind AI — License Expired",
+         MB_OK | MB_ICONWARNING
+      );
+      Print("!!! GoldMind AI LICENSE EXPIRED on ", TimeToString(LICENSE_EXPIRY));
+      Print("!!! Contact Syarief Azman: https://t.me/syariefazman");
+      return(INIT_FAILED);
+   }
+   Print("License valid until: ", TimeToString(LICENSE_EXPIRY));
+
    //--- Set timer to fire every 60 seconds
    EventSetTimer(60);
 
