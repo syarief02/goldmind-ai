@@ -18,7 +18,7 @@
 //+------------------------------------------------------------------+
 //| INPUT PARAMETERS — User configurable                              |
 //+------------------------------------------------------------------+
-input string   InpBackendURL       = "http://localhost:8000/signal";  // Backend URL (POST /signal)
+input string   InpBackendURL       = "http://127.0.0.1:8000/signal";  // Backend URL (POST /signal)
 input int      InpMaxSpreadPoints  = 50;       // Max spread (points) to allow trading
 input double   InpRiskPercent      = 1.0;      // Risk % of account balance per trade
 input double   InpMinRR            = 1.5;      // Minimum reward-to-risk ratio

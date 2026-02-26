@@ -140,7 +140,7 @@ INFO:     Application startup complete.
 ### ✅ Test that it's working:
 Open a **new** terminal window (Windows+R → cmd) and type:
 ```
-curl http://localhost:8000/health
+curl http://127.0.0.1:8000/health
 ```
 You should see:
 ```json
@@ -195,14 +195,14 @@ This step is **critical**. Without it, the EA cannot communicate with your serve
 3. Click the **Expert Advisors** tab
 4. Check the box: ☑ **Allow WebRequest for listed URL**
 5. In the text field below, click **Add** (or double-click in the empty area)
-6. Type exactly: `http://localhost:8000`
+6. Type exactly: `http://127.0.0.1:8000`
 7. Press **Enter**
 8. Click **OK**
 
 Your settings should look like this:
 ```
 ☑ Allow WebRequest for listed URL
-   http://localhost:8000
+   http://127.0.0.1:8000
 ```
 
 ---
@@ -232,7 +232,7 @@ The chart timeframe **does not matter**. The EA uses its own `Timeframe` input s
 
 #### Inputs tab:
 - You can leave everything as default for now, or adjust:
-  - `BackendURL` = `http://localhost:8000/signal` (leave as is)
+  - `BackendURL` = `http://127.0.0.1:8000/signal` (leave as is)
   - `RiskPercent` = `1.0` (means 1% of your balance per trade)
   - `MaxSpreadPoints` = `50` (blocks trades when spread is too wide)
 
@@ -251,9 +251,9 @@ Look at the top toolbar of MT5. You should see a button that says **"Algo Tradin
 
 ```
 === GoldMind AI EA initialized ===
-Backend URL: http://localhost:8000/signal
+Backend URL: http://127.0.0.1:8000/signal
 >>> No pending order found, requesting new signal...
-Sending signal request to: http://localhost:8000/signal
+Sending signal request to: http://127.0.0.1:8000/signal
 HTTP 200 Response: {"symbol":"XAUUSD",...}
 Signal: bias=bullish confidence=0.72 veto=false
 Order: type=buy_stop entry=2658.00 SL=2650.00 TP=2670.00
@@ -278,7 +278,7 @@ When you attach the EA, you can change these settings in the **Inputs** tab:
 
 | Setting | Default | What It Does |
 |---------|---------|-------------|
-| **BackendURL** | `http://localhost:8000/signal` | Where to find your server. Only change this if your server is on another computer |
+| **BackendURL** | `http://127.0.0.1:8000/signal` | Where to find your server. Only change this if your server is on another computer |
 | **MaxSpreadPoints** | `50` | If the spread is wider than this, no trade will be placed. Lower = safer but fewer trades |
 | **RiskPercent** | `1.0` | How much of your account to risk per trade. 1.0 = 1%. Higher = bigger trades but more risk |
 | **MinRR** | `1.5` | Minimum reward-to-risk ratio. 1.5 means the target profit must be 1.5× bigger than the stop loss |
@@ -341,7 +341,7 @@ After you restart your computer, you need to start two things:
 **How to fix:**
 1. Go to **Tools → Options → Expert Advisors**
 2. Make sure ☑ **Allow WebRequest for listed URL** is checked
-3. Make sure `http://localhost:8000` is in the list
+3. Make sure `http://127.0.0.1:8000` is in the list
 4. Click OK and try again
 
 ### Problem: "WebRequest failed" or timeout
@@ -449,4 +449,5 @@ mt5 xauusd/
 ---
 
 *Built with ❤️ using FastAPI, OpenAI Structured Outputs, and MQL5*
+
 
