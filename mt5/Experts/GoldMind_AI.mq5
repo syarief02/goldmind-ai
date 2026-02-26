@@ -141,9 +141,23 @@ void OnTimer()
       return;
    }
 
-   //--- Case 2: No pending order and no position → request new signal
+   //--- Case 2: No pending order and no position
    if(!hasPending)
    {
+      //--- Only request if 4 hours have passed since last request (or first run)
+      if(g_lastSignalTime > 0 && elapsed < refreshSec)
+      {
+         //--- Still within cooldown window, wait
+         long remaining = refreshSec - elapsed;
+         long mins = remaining / 60;
+         static datetime lastLogTime = 0;
+         if(now - lastLogTime >= 300) // Log every 5 minutes to avoid spam
+         {
+            Print(">>> Waiting for next signal window... ", mins, " minutes remaining");
+            lastLogTime = now;
+         }
+         return;
+      }
       Print(">>> No pending order found, requesting new signal...");
       RequestAndPlace();
       return;
