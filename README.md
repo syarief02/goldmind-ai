@@ -52,11 +52,12 @@ on your computer             runs on XAUUSD chart       analyzes the market
 ```
 
 **In plain English:**
-- Every few minutes, the EA in MT5 collects the latest candle data (prices) and sends it to your local Python server
+- Every **4 hours**, the EA in MT5 collects the latest candle data (prices) and sends it to your local Python server
 - The server sends that data to OpenAI (ChatGPT) and asks it to analyze the chart
 - ChatGPT responds with a trading signal: "place a buy stop here" or "place a sell stop here" or "don't trade right now"
 - The EA checks the signal for safety (is the spread too wide? is the risk too high?) and if everything looks good, it places a pending order
-- Every 4 hours, if the pending order hasn't been triggered, the EA cancels it and asks for a fresh signal
+- After 4 hours, if the pending order hasn't been triggered, the EA cancels it and asks for a fresh signal
+- If the EA already has an open position, it **skips** the request entirely to save API costs
 
 ---
 
@@ -93,9 +94,9 @@ The "backend" is a small program that runs on your computer. It receives data fr
 3. A black window (terminal) will open
 
 ### Navigate to the backend folder:
-Type this command and press Enter:
+Type this command and press Enter (adjust the path if your project is in a different location):
 ```
-cd "c:\Users\User\OneDrive\Desktop\mt5 xauusd\backend"
+cd "path\to\your\goldmind-ai\backend"
 ```
 
 ### Install the required packages:
@@ -250,15 +251,16 @@ Look at the top toolbar of MT5. You should see a button that says **"Algo Tradin
 2. You should see messages like:
 
 ```
-=== GoldMind AI EA initialized ===
+License valid until: 2026.03.31 23:59
+=== GoldMind AI initialized ===
 Backend URL: http://127.0.0.1:8000/signal
 >>> No pending order found, requesting new signal...
 Sending signal request to: http://127.0.0.1:8000/signal
 HTTP 200 Response: {"symbol":"XAUUSD",...}
 Signal: bias=bullish confidence=0.72 veto=false
-Order: type=buy_stop entry=2658.00 SL=2650.00 TP=2670.00
->>> Placing buy_stop entry=2658.00 SL=2650.00 TP=2670.00 lots=0.12
->>> Order placed successfully! Ticket #12345678
+Order: type=buy_stop entry=5205.18 SL=5191.08 TP=5220.68
+>>> Placing buy_stop entry=5205.18 SL=5191.08 TP=5220.68 lots=0.01
+>>> Order placed successfully! Ticket #349283891
 ```
 
 ### Check the Trade tab:
@@ -268,7 +270,8 @@ Order: type=buy_stop entry=2658.00 SL=2650.00 TP=2670.00
 ### What happens next:
 - **If the price hits the entry level** → the pending order becomes a real trade
 - **If 4 hours pass and it hasn't triggered** → the EA cancels it and asks for a new signal
-- **If the AI says "don't trade"** → the EA logs "Signal vetoed" and waits for the next check
+- **If the AI says "don't trade"** → the EA logs "Signal vetoed" and waits 4 hours before trying again
+- **If the safety filter rejects the trade** (bad R:R, spread too wide, etc.) → the EA waits 4 hours before the next request
 
 ---
 
@@ -315,7 +318,7 @@ After you restart your computer, you need to start two things:
 1. Open a terminal (Windows+R → cmd)
 2. Navigate to the backend folder:
    ```
-   cd "c:\Users\User\OneDrive\Desktop\mt5 xauusd\backend"
+   cd "path\to\your\goldmind-ai\backend"
    ```
 3. Start the server:
    ```
@@ -391,6 +394,18 @@ After you restart your computer, you need to start two things:
 3. Open `backend\.env` in Notepad and replace the old key
 4. Restart the server (Ctrl+C, then `python main.py`)
 
+### Problem: "Backend returned HTTP 500"
+**What it means:** The server received the request but crashed while processing it.
+**How to fix:**
+1. Check if you have **API credits** at https://platform.openai.com/settings/organization/billing/overview
+2. Check the server terminal for error details (look for red text)
+3. Make sure the OpenAI model `gpt-4o-2024-08-06` is available on your account
+4. Try restarting the server (Ctrl+C, then `python main.py`)
+
+### Problem: "REJECTED: R:R 1.02 < min 1.5"
+**What it means:** The AI suggested a trade, but the reward-to-risk ratio wasn't good enough.
+**How to fix:** This is the safety filter working correctly! The EA will request a new signal in 4 hours. If this happens frequently, you can lower `MinRR` (e.g., from 1.5 to 1.2), but a higher R:R is generally safer.
+
 ---
 
 ## ❓ Frequently Asked Questions
@@ -399,7 +414,7 @@ After you restart your computer, you need to start two things:
 A: No. This is an AI-assisted trading tool, not a money-printing machine. AI can make wrong predictions. Always test on a **demo account** first, and never risk money you can't afford to lose.
 
 **Q: How much does it cost to run?**
-A: Each signal request costs about $0.01–$0.05 in OpenAI API usage. With signals every 4 hours, that's roughly $0.06–$0.30 per day, or about $2–$9 per month.
+A: Each signal request costs about $0.01–$0.05 in OpenAI API usage. With signals every 4 hours (max 6 per day), that's roughly $0.06–$0.30 per day, or about **$2–$9 per month**. The EA only makes a request when there's no open position and no pending order, so actual costs may be even lower.
 
 **Q: Can I run this on a VPS?**
 A: Yes! Run the Python server and MT5 on the same VPS. Change `BackendURL` if they're on different machines.
@@ -421,7 +436,7 @@ A: Yes. The key is stored only on your computer in the `.env` file. It's never s
 ## 📁 Project File Structure
 
 ```
-mt5 xauusd/
+goldmind-ai/
 ├── backend/                        ← The Python server
 │   ├── main.py                     ← Server code (you don't need to edit this)
 │   ├── requirements.txt            ← List of Python packages needed
@@ -431,7 +446,7 @@ mt5 xauusd/
 │   ├── Include/
 │   │   └── JASONNode.mqh           ← JSON parser (copy to MQL5\Include\)
 │   └── Experts/
-│       └── GoldMind_AI.mq5    ← The EA (copy to MQL5\Experts\)
+│       └── GoldMind_AI.mq5         ← The EA (copy to MQL5\Experts\)
 ├── .gitignore                      ← Prevents .env from being uploaded
 └── README.md                       ← This file you're reading
 ```
@@ -448,6 +463,8 @@ mt5 xauusd/
 
 ---
 
-*Built with ❤️ using FastAPI, OpenAI Structured Outputs, and MQL5*
+*Built with ❤️ by Syarief Azman using FastAPI, OpenAI Structured Outputs, and MQL5*
+
+*For support, contact: [t.me/syariefazman](https://t.me/syariefazman)*
 
 
