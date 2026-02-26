@@ -426,7 +426,15 @@ A: **No — only attach this EA to a XAUUSD (gold) chart.** The AI prompt is spe
 A: Yes, both the server and MT5 need to be running for the EA to work. A VPS is recommended for 24/7 operation.
 
 **Q: Can I change the AI model?**
-A: Yes. Edit `OPENAI_MODEL` in `backend\.env`. Use models that support Structured Outputs (e.g., `gpt-4o-2024-08-06` or newer).
+A: Yes! Edit `OPENAI_MODEL` in `backend\.env`. The file includes commented options you can switch between:
+
+| Model | Speed | Quality | Cost per signal |
+|-------|-------|---------|----------------|
+| `gpt-4o-2024-08-06` | ⚡ Fast | Great | ~$0.01–$0.05 (default) |
+| `gpt-5-mini` | ⚡ Fast | Very good | ~$0.02–$0.08 |
+| `gpt-5` | 🐢 Slower | Best | ~$0.05–$0.15 |
+
+To switch: open `backend\.env`, comment out the current model line with `#`, and uncomment the one you want. Then restart the server.
 
 **Q: Is my API key safe?**
 A: Yes. The key is stored only on your computer in the `.env` file. It's never sent to MT5 or anywhere else. The `.gitignore` file ensures it won't be uploaded to GitHub.
