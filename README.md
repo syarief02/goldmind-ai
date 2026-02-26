@@ -102,6 +102,27 @@ The EA then runs this through **6 safety filters** before placing any order:
 
 Only if **all 6 filters pass** will the EA place the pending order.
 
+### 💰 How Lot Size Is Calculated
+
+The EA automatically calculates the correct lot size based on your `RiskPercent` setting and the stop loss distance:
+
+```
+lots = (balance × risk%) / (SL distance in ticks × tick value per tick)
+```
+
+**Example:** You have a $1,000 account with `RiskPercent = 1.0` (1%):
+- Risk budget = $1,000 × 1% = **$10**
+- AI suggests SL = 10 points away (100 ticks for XAUUSD)
+- Tick value = $0.01 per tick per 0.01 lot
+- Lots = $10 / (100 × $1.00) = **0.10 lots**
+
+**What if the calculated lot is too small?** If your account is small or the SL distance is large, the calculated lot may fall below your broker's minimum (usually 0.01 lots). In this case, the EA will:
+1. Use the **broker's minimum lot** (e.g., 0.01) instead
+2. Log a warning: `"Using minimum lot"`
+3. Tell you the **actual dollar risk** and **actual risk %** so you know exactly what you're risking
+
+This means your actual risk per trade may be **higher** than your configured `RiskPercent` — but it's the smallest trade your broker allows. If the risk is too high for your comfort, deposit more funds to bring the percentage down.
+
 ---
 
 ## 📋 What You Need Before Starting
