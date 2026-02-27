@@ -1,6 +1,6 @@
-# 🤖 MT5 GoldMind AI Trading System
+# 🤖 GoldMind AI — MT5 Trading System
 
-> **What is this?** This is a tool that uses AI (ChatGPT) to analyze gold (XAUUSD) price charts and automatically place trades for you in MetaTrader 5. It runs on your own computer — you just need to start two things: a small Python server and the EA in MT5.
+> **What is this?** An AI-powered trading tool that uses ChatGPT to analyze gold (XAUUSD) price charts and automatically place trades in MetaTrader 5. It runs entirely on your own computer — just start the Python server and the EA in MT5.
 
 ---
 
@@ -14,7 +14,7 @@
 6. [Step 4: Allow WebRequest in MT5](#-step-4-allow-webrequest-in-mt5-very-important)
 7. [Step 5: Attach the EA to a Chart](#-step-5-attach-the-ea-to-a-chart)
 8. [Step 6: Watch It Work](#-step-6-watch-it-work)
-9. [Understanding the EA Settings](#-understanding-the-ea-settings)
+9. [Understanding the EA Settings (Detailed)](#️-understanding-the-ea-settings-detailed)
 10. [How to Stop the EA](#-how-to-stop-the-ea)
 11. [How to Restart Everything](#-how-to-restart-everything-after-pc-reboot)
 12. [Troubleshooting Common Problems](#-troubleshooting-common-problems)
@@ -24,7 +24,7 @@
 
 ## 🔄 How Does This Work?
 
-Here's the simple version:
+Here's the big picture:
 
 ```
 YOU START THE SERVER         THE EA IN MT5              OPENAI (CHATGPT)
@@ -52,12 +52,12 @@ on your computer             runs on XAUUSD chart       analyzes the market
 ```
 
 **In plain English:**
-- Every **4 hours**, the EA in MT5 collects the latest candle data (prices) and sends it to your local Python server
-- The server sends that data to OpenAI (ChatGPT) and asks it to analyze the chart
-- ChatGPT responds with a trading signal: "place a buy stop here" or "place a sell stop here" or "don't trade right now"
-- The EA checks the signal for safety (is the spread too wide? is the risk too high?) and if everything looks good, it places a pending order
-- After 4 hours, if the pending order hasn't been triggered, the EA cancels it and asks for a fresh signal
-- If the EA already has an open position, it **skips** the request entirely to save API costs
+- Every **4 hours**, the EA collects the latest candle data (prices) and sends it to your local Python server.
+- The server forwards that data to OpenAI (ChatGPT) for chart analysis.
+- ChatGPT responds with a trading signal: *"place a buy stop here"*, *"place a sell stop here"*, or *"don't trade right now"*.
+- The EA runs the signal through **6 safety filters** (spread, stop level, entry price, SL direction, R:R ratio, lot size). If everything passes, it places a pending order.
+- After 4 hours, if the pending order hasn't been triggered, the EA cancels it and requests a fresh signal.
+- If the EA already has an open position, it **skips** the request entirely to save API costs.
 
 ### 🧠 How the AI Analysis Works
 
@@ -92,13 +92,16 @@ The server sends **two things** to OpenAI:
 }
 ```
 
-The EA then runs this through **6 safety filters** before placing any order:
-1. ✅ Spread check — is the spread reasonable?
-2. ✅ Stop level check — does the broker allow this entry distance?
-3. ✅ Entry price validation — is entry above/below current price?
-4. ✅ SL direction check — is the stop loss on the correct side?
-5. ✅ Risk-reward ratio — is the potential profit worth the risk?
-6. ✅ Lot size calculation — how much to risk based on your account balance?
+The EA then runs the signal through **6 safety filters** before placing any order:
+
+| # | Filter | Question |
+|---|--------|----------|
+| 1 | Spread check | Is the spread reasonable? |
+| 2 | Stop level check | Does the broker allow this entry distance? |
+| 3 | Entry price validation | Is entry above/below the current price? |
+| 4 | SL direction check | Is the stop loss on the correct side? |
+| 5 | Risk-reward ratio | Is the potential profit worth the risk? |
+| 6 | Lot size calculation | How much to risk based on your account balance? |
 
 Only if **all 6 filters pass** will the EA place the pending order.
 
@@ -127,7 +130,7 @@ This means your actual risk per trade may be **higher** than your configured `Ri
 
 ## 📋 What You Need Before Starting
 
-Before you begin, make sure you have these three things:
+Before you begin, make sure you have these three things ready:
 
 ### 1. Python (programming language)
 - **Download from:** https://www.python.org/downloads/
@@ -150,7 +153,7 @@ Before you begin, make sure you have these three things:
 
 ## 🖥️ Step 1: Set Up the Python Backend (Server)
 
-The "backend" is a small program that runs on your computer. It receives data from MT5 and talks to ChatGPT.
+The "backend" is a lightweight Python server that runs on your computer. It receives market data from the MT5 EA and forwards it to ChatGPT for analysis.
 
 ### Open a terminal (Command Prompt or PowerShell):
 1. Press **Windows key + R** on your keyboard
@@ -332,11 +335,14 @@ Order: type=buy_stop entry=5205.18 SL=5191.08 TP=5220.68
 2. You should see a pending order (buy stop or sell stop) for XAUUSD
 
 ### What happens next:
-- **If the price hits the entry level** → the pending order becomes a real trade
-- **If 4 hours pass and it hasn't triggered** → the EA cancels it and asks for a new signal
-- **If the AI says "don't trade"** → the EA logs "Signal vetoed" and waits 4 hours before trying again
-- **If the safety filter rejects the trade** (bad R:R, spread too wide, etc.) → the EA waits 4 hours before the next request
-- **If the server/API fails** (no internet, API error) → the EA retries in **15 minutes** instead of waiting the full 4 hours
+
+| Scenario | What the EA Does |
+|----------|------------------|
+| Price hits the entry level | Pending order becomes a live trade |
+| 4 hours pass without triggering | EA cancels the order and requests a fresh signal |
+| AI says "don't trade" | EA logs "Signal vetoed" and waits 4 hours |
+| Safety filter rejects the trade | EA waits 4 hours before the next request |
+| Server/API fails | EA retries in **15 minutes** (shorter cooldown) |
 
 ---
 
@@ -758,18 +764,18 @@ A: Yes. The key is stored only on your computer in the `.env` file. It's never s
 
 ```
 goldmind-ai/
-├── backend/                        ← The Python server
-│   ├── main.py                     ← Server code (you don't need to edit this)
-│   ├── requirements.txt            ← List of Python packages needed
-│   ├── .env.example                ← Template for API key
-│   └── .env                        ← YOUR actual API key (don't share this!)
+├── backend/                        ← Python backend server
+│   ├── main.py                     ← Server code (FastAPI + OpenAI integration)
+│   ├── requirements.txt            ← Python package dependencies
+│   ├── .env.example                ← Template for API key configuration
+│   └── .env                        ← Your actual API key (never share this!)
 ├── mt5/                            ← MetaTrader 5 files
 │   ├── Include/
-│   │   └── JASONNode.mqh           ← JSON parser (copy to MQL5\Include\)
+│   │   └── JASONNode.mqh           ← JSON parser library (→ MQL5\Include\)
 │   └── Experts/
-│       └── GoldMind_AI.mq5         ← The EA (copy to MQL5\Experts\)
+│       └── GoldMind_AI.mq5         ← The Expert Advisor (→ MQL5\Experts\)
 ├── .gitignore                      ← Prevents .env from being uploaded
-└── README.md                       ← This file you're reading
+└── README.md                       ← This documentation
 ```
 
 ---
@@ -784,6 +790,8 @@ goldmind-ai/
 
 ---
 
-*Built with ❤️ by Syarief Azman using FastAPI, OpenAI Structured Outputs, and MQL5*
-
-*For support, contact: [t.me/syariefazman](https://t.me/syariefazman)*
+<p align="center">
+  <strong>Built with ❤️ by Syarief Azman</strong><br>
+  FastAPI · OpenAI Structured Outputs · MQL5<br><br>
+  📬 For support: <a href="https://t.me/syariefazman">t.me/syariefazman</a>
+</p>
