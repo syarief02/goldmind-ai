@@ -8,7 +8,7 @@
 
 1. [How Does This Work?](#-how-does-this-work)
 2. [What You Need Before Starting](#-what-you-need-before-starting)
-3. [Step 1: Set Up the Python Backend](#-step-1-set-up-the-python-backend-server)
+3. [Step 1: Set Up the Python Backend](#%EF%B8%8F-step-1-set-up-the-python-backend-server)
 4. [Step 2: Start the Server](#-step-2-start-the-server)
 5. [Step 3: Install the EA in MetaTrader 5](#-step-3-install-the-ea-in-metatrader-5)
 6. [Step 4: Allow WebRequest in MT5](#-step-4-allow-webrequest-in-mt5-very-important)
