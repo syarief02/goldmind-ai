@@ -63,16 +63,18 @@ on your computer             runs on XAUUSD chart       analyzes the market
 
 The server sends **two things** to OpenAI:
 
-**1. A set of rules** telling the AI how to behave:
-- "You are a professional XAUUSD trading analyst"
-- Use ATR (volatility indicator) to set price buffers
-- Propose breakout-style pending orders only
-- Entry must be above Ask (for buys) or below Bid (for sells)
-- Stop loss and take profit must respect minimum risk-reward ratio
-- If no clear setup exists, veto (don't trade)
+**1. A multi-layer analysis prompt** telling the AI to:
+- Perform **technical analysis** — identify key support/resistance levels, trend direction, and candlestick patterns from the candle data
+- Consider **macro/price context** — where is price in its recent range? Is the market trending, consolidating, or in a squeeze?
+- Factor in **session context** — which trading session is active (Asian, London, New York, or overlap)? Is liquidity favorable for breakouts?
+- Make a **strategy decision** — choose between placing a breakout order or vetoing if conditions are poor
+- Apply **confidence calibration** — 0.80+ = strong conviction, below 0.40 = veto
+- Use ATR (volatility indicator) for setting entry buffers, stop loss, and take profit distances
+- Your **Malaysia timezone (UTC+8)** is included for session awareness
 
 **2. The latest market data** from MT5:
 - Last 50 candles (open, high, low, close, volume for each)
+- **Market structure summary** — 50-candle high/low, price position in range, short-term trend direction
 - Current bid/ask prices and spread
 - ATR value (measures how much the price typically moves)
 
@@ -83,10 +85,10 @@ The server sends **two things** to OpenAI:
   "confidence": 0.72,
   "order": {
     "type": "buy_stop",
-    "entry": 5205.18,
-    "sl": 5191.08,
-    "tp": 5220.68,
-    "comment": "bullish breakout potential"
+    "entry": 2928.50,
+    "sl": 2923.10,
+    "tp": 2936.60,
+    "comment": "London breakout above R1"
   },
   "veto": false
 }
@@ -325,8 +327,8 @@ Backend URL: http://127.0.0.1:8000/signal
 Sending signal request to: http://127.0.0.1:8000/signal
 HTTP 200 Response: {"symbol":"XAUUSD",...}
 Signal: bias=bullish confidence=0.72 veto=false
-Order: type=buy_stop entry=5205.18 SL=5191.08 TP=5220.68
->>> Placing buy_stop entry=5205.18 SL=5191.08 TP=5220.68 lots=0.01
+Order: type=buy_stop entry=2928.50 SL=2923.10 TP=2936.60
+>>> Placing buy_stop entry=2928.50 SL=2923.10 TP=2936.60 lots=0.01
 >>> Order placed successfully! Ticket #349283891
 ```
 
