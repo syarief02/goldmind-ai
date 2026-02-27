@@ -340,21 +340,268 @@ Order: type=buy_stop entry=5205.18 SL=5191.08 TP=5220.68
 
 ---
 
-## ⚙️ Understanding the EA Settings
+## ⚙️ Understanding the EA Settings (Detailed)
 
-When you attach the EA, you can change these settings in the **Inputs** tab:
+When you attach the EA to a chart, a dialog box appears with an **Inputs** tab where you can configure each parameter. Below is a detailed explanation of every parameter — what it does, how it works internally, and tips for tuning it.
 
-| Setting | Default | What It Does |
-|---------|---------|-------------|
-| **BackendURL** | `http://127.0.0.1:8000/signal` | Where to find your server. Only change this if your server is on another computer |
-| **MaxSpreadPoints** | `50` | If the spread is wider than this, no trade will be placed. Lower = safer but fewer trades |
-| **RiskPercent** | `1.0` | How much of your account to risk per trade. 1.0 = 1%. Higher = bigger trades but more risk |
-| **MinRR** | `1.5` | Minimum reward-to-risk ratio. 1.5 means the target profit must be 1.5× bigger than the stop loss |
-| **Timeframe** | `M15` | Which candle data to analyze. The EA pulls this timeframe's candles regardless of what chart timeframe you're viewing. M15 is recommended for XAUUSD |
-| **CandleCount** | `200` | How many candles to send to ChatGPT. More = better analysis but slower |
-| **RefreshHours** | `4` | How often to cancel old orders and get new signals |
-| **MagicNumber** | `20250226` | A unique ID for this EA's orders. Only change if running multiple EAs |
-| **Timeout** | `10000` | How long to wait for server response (milliseconds). 10000 = 10 seconds |
+---
+
+### 1. `BackendURL` — Server Address
+
+| | |
+|---|---|
+| **Type** | `string` |
+| **Default** | `http://127.0.0.1:8000/signal` |
+
+**What it does:** This is the full URL that the EA sends its market data to via an HTTP POST request. The Python backend server listens at this address and responds with a trading signal.
+
+**How it works internally:**
+- Every time the EA needs a new signal, it builds a JSON payload containing candle data, current prices, ATR, and your constraint settings, then sends it to this URL using MQL5's `WebRequest()` function.
+- The `/signal` at the end is the specific API endpoint on the backend that processes the request.
+
+**When to change it:**
+- **Same computer:** Leave as default (`127.0.0.1` means "this computer").
+- **VPS or remote server:** Change to the IP address of the machine running the Python server (e.g., `http://192.168.1.100:8000/signal`).
+- **Different port:** If you changed the port in `main.py`, update the `:8000` part to match.
+
+> ⚠️ **Important:** Whatever URL you set here, you **must** also add the base URL (without `/signal`) to MT5's allowed WebRequest list under **Tools → Options → Expert Advisors**. For example, add `http://127.0.0.1:8000`.
+
+---
+
+### 2. `MaxSpreadPoints` — Spread Filter
+
+| | |
+|---|---|
+| **Type** | `integer` |
+| **Default** | `50` |
+
+**What it does:** Sets the maximum allowable spread (in points) before the EA refuses to place a trade. This is a safety filter to prevent trading during volatile or illiquid conditions when spreads widen.
+
+**How it works internally:**
+- **In the EA (Safety Filter 1):** Before placing any order, the EA checks the current live spread. If `spread > MaxSpreadPoints`, the trade is rejected with the message `"REJECTED: Spread X > max Y"`.
+- **In the backend:** The backend also performs a server-side spread check as an extra layer of protection. If the spread sent by the EA exceeds this value, the backend returns a veto before even calling OpenAI, saving you API costs.
+- **In the AI prompt:** This value is passed to the AI in the system prompt as a constraint, so the AI is also told not to propose trades when the spread is too high.
+
+**How to set it:**
+- **Lower values (e.g., 30):** More conservative — only trades when spreads are tight. Fewer trades but better entry conditions.
+- **Higher values (e.g., 100):** More permissive — trades even during wider spreads. More trades but potentially worse fills.
+- Check your broker's typical XAUUSD spread. If it's normally 15–25 points, a `MaxSpreadPoints` of 50 gives comfortable headroom.
+
+---
+
+### 3. `RiskPercent` — Risk Per Trade
+
+| | |
+|---|---|
+| **Type** | `double` (decimal number) |
+| **Default** | `1.0` (= 1%) |
+
+**What it does:** Controls how much of your **account balance** you risk on each trade. The EA uses this to calculate the lot size.
+
+**How it works internally:**
+The lot size formula is:
+
+```
+risk_amount = account_balance × (RiskPercent / 100)
+sl_ticks     = |entry - stop_loss| / tick_size
+risk_per_lot = sl_ticks × tick_value
+lots         = risk_amount / risk_per_lot
+```
+
+For example, with a $1,000 account and `RiskPercent = 1.0`:
+- Risk budget = $1,000 × 1% = **$10**
+- If the AI sets a stop loss 10 points away (100 ticks), and tick value is $0.01 per tick per 0.01 lot:
+- Lots = $10 / (100 × $1.00) = **0.10 lots**
+
+**Special case — minimum lot:**
+If the calculated lot size is smaller than your broker's minimum (usually 0.01 lots), the EA will:
+1. Use the broker's minimum lot instead
+2. Log a warning: `"Using minimum lot"`
+3. Display the **actual dollar risk** and **actual risk %** so you know the real exposure
+
+This means your actual risk may exceed `RiskPercent` — but it's the smallest trade possible.
+
+**How to set it:**
+- **`0.5` (0.5%):** Very conservative, good for small accounts or cautious traders.
+- **`1.0` (1%):** Standard risk management — the most common setting.
+- **`2.0` (2%):** Aggressive — higher potential returns but also larger drawdowns.
+- **`5.0+` (5%+):** Very aggressive — not recommended unless on a demo account.
+
+---
+
+### 4. `MinRR` — Minimum Reward-to-Risk Ratio
+
+| | |
+|---|---|
+| **Type** | `double` (decimal number) |
+| **Default** | `1.5` |
+
+**What it does:** Sets the minimum acceptable reward-to-risk ratio for a trade. If the AI's suggested trade doesn't meet this threshold, the EA rejects it.
+
+**How it works internally:**
+- **Safety Filter 6** calculates the R:R as:
+  ```
+  R:R = |TP - entry| / |entry - SL|
+  ```
+- If the result is less than `MinRR`, the trade is rejected with `"REJECTED: R:R X < min Y"`.
+- This value is also passed to the AI in the system prompt as a constraint: `"TP must respect min R:R of {MinRR}"`, so the AI tries to design trades that meet this ratio from the start.
+
+**How to set it:**
+- **`1.0`:** You're accepting trades where the potential profit equals the potential loss. More signals but lower quality.
+- **`1.5`:** Target profit must be 1.5× the stop loss distance. Good balance of quality and quantity.
+- **`2.0`:** Only take trades where you stand to gain twice what you risk. Higher quality but fewer trades.
+- **`3.0+`:** Very selective — only the best setups pass. Very few trades.
+
+---
+
+### 5. `Timeframe` — Candle Timeframe
+
+| | |
+|---|---|
+| **Type** | `ENUM_TIMEFRAMES` (dropdown) |
+| **Default** | `PERIOD_M15` (15-minute candles) |
+
+**What it does:** Determines which timeframe's candle data (OHLCV) the EA collects and sends to the AI for analysis. This is **independent** of the chart timeframe you're viewing in MT5.
+
+**How it works internally:**
+- The EA calls `CopyRates(_Symbol, InpTimeframe, 0, InpCandleCount, rates)` to fetch historical candle data at this specific timeframe.
+- The candle data is sent as part of the JSON request to the backend, along with a `"timeframe"` string label (e.g., `"M15"`, `"H1"`).
+- The AI uses this data to analyze price action and propose breakout levels.
+- The EA also computes ATR(14) from these candles to measure recent volatility.
+
+**Available options:**
+| Value | Candle Period |
+|-------|--------------|
+| `M1` | 1 minute |
+| `M5` | 5 minutes |
+| `M15` | 15 minutes **(default)** |
+| `M30` | 30 minutes |
+| `H1` | 1 hour |
+| `H4` | 4 hours |
+| `D1` | 1 day |
+| `W1` | 1 week |
+| `MN1` | 1 month |
+
+**How to set it:**
+- **M15 (recommended):** Provides a good balance between granularity and noise. With `CandleCount = 200`, this covers about 50 hours of price data.
+- **H1 or H4:** Smoother data with less noise, better for swing trading. You may want to reduce `CandleCount` since each candle covers more time.
+- **M1 or M5:** Very granular, lots of noise. Generally not recommended for this type of breakout analysis.
+
+---
+
+### 6. `CandleCount` — Number of Candles
+
+| | |
+|---|---|
+| **Type** | `integer` |
+| **Default** | `200` |
+
+**What it does:** Sets how many historical candles (at the configured `Timeframe`) the EA sends to the backend for AI analysis.
+
+**How it works internally:**
+- The EA fetches this many candles from MT5's history using `CopyRates()`.
+- All candles are included in the JSON payload sent to the backend, ordered from oldest to newest.
+- **However**, the backend only sends the **last 50 candles** to OpenAI (to keep token usage reasonable), regardless of how many the EA sends. The full candle set is still used to compute ATR(14) on the server side.
+- More candles = more historical context for ATR calculation, but the AI only sees the most recent 50.
+
+**How to set it:**
+- **`50`:** Minimum useful amount. The AI sees all of them, but ATR has limited history.
+- **`200` (default):** Good balance — provides enough history for accurate ATR calculation while keeping the payload size manageable.
+- **`500+`:** More historical context for ATR, but larger payload and slightly slower requests. The AI still only sees the last 50.
+
+**Data coverage examples (with default M15 timeframe):**
+| CandleCount | Time Coverage |
+|-------------|--------------|
+| 50 | ~12.5 hours |
+| 200 | ~50 hours (~2 days) |
+| 500 | ~125 hours (~5 days) |
+
+---
+
+### 7. `RefreshHours` — Signal Refresh Interval
+
+| | |
+|---|---|
+| **Type** | `integer` |
+| **Default** | `4` (hours) |
+
+**What it does:** Controls two key behaviors:
+1. **How long a pending order lives** before it's automatically cancelled and a fresh signal is requested.
+2. **The cooldown period** between signal requests when no pending order exists (e.g., after a veto or a rejected trade).
+
+**How it works internally:**
+- The EA runs a timer every 60 seconds via `OnTimer()`.
+- **Case 1 — Pending order exists and refresh time has passed:** The EA cancels the stale pending order and immediately requests a new signal.
+- **Case 2 — No pending order and cooldown has passed:** The EA requests a new signal.
+- **Case 3 — Pending order exists and within refresh window:** The EA does nothing and waits.
+- The refresh interval is also sent to the backend as `expiry_minutes` (= `RefreshHours × 60`), which the AI uses to set the order's expiration time.
+
+**Retry on failure:** If the last request failed (server down, API error, etc.), the EA uses a shorter cooldown of **15 minutes** instead of the full `RefreshHours`, so it recovers faster from temporary issues.
+
+**How to set it:**
+- **`4` (default):** The EA checks for new setups roughly 6 times per day (during market hours). Balances API costs with signal freshness.
+- **`1`:** Very frequent — new signal every hour. Higher API costs (~$0.24–$1.20/day) but more responsive to market changes.
+- **`8` or `12`:** Infrequent — good for longer-term setups or to minimize API costs.
+
+---
+
+### 8. `MagicNumber` — EA Identifier
+
+| | |
+|---|---|
+| **Type** | `long` (integer) |
+| **Default** | `20250226` |
+
+**What it does:** A unique numeric identifier that tags all orders and positions placed by this EA. It allows the EA to distinguish its own trades from those placed manually or by other EAs.
+
+**How it works internally:**
+- On initialization, the EA sets `trade.SetExpertMagicNumber(InpMagicNumber)` so every order it places is tagged with this number.
+- When checking for existing positions (`HasOpenPosition()`) or pending orders (`HasPendingOrder()`), the EA filters by both the symbol (`_Symbol`) **and** this magic number. This means:
+  - It only manages its own orders — it won't interfere with your manual trades.
+  - It correctly detects when it already has a position open, preventing duplicate signals.
+
+**When to change it:**
+- **Single EA:** Leave as default. No need to change.
+- **Multiple EAs on the same account:** Each EA instance must have a **unique** `MagicNumber` so they don't interfere with each other. For example, use `20250226` for one and `20250227` for another.
+- **Same EA on different symbols (not recommended):** If you ever adapt this EA for other symbols, give each a unique magic number.
+
+---
+
+### 9. `Timeout` — WebRequest Timeout
+
+| | |
+|---|---|
+| **Type** | `integer` (milliseconds) |
+| **Default** | `10000` (= 10 seconds) |
+
+**What it does:** Sets the maximum time (in milliseconds) that the EA will wait for a response from the backend server before giving up.
+
+**How it works internally:**
+- This value is passed directly to MQL5's `WebRequest()` function as the timeout parameter.
+- If the server doesn't respond within this time, `WebRequest()` returns `-1` and the EA logs an error.
+- On timeout, the EA sets `g_lastRequestFailed = true`, which triggers the shorter 15-minute retry cooldown instead of the full `RefreshHours` wait.
+
+**How to set it:**
+- **`10000` (10s, default):** Usually enough for the backend to call OpenAI and return a response. OpenAI typically responds in 2–8 seconds.
+- **`15000–20000` (15–20s):** Use if you experience occasional timeouts, especially with slower models like `gpt-5`.
+- **`30000` (30s):** Maximum recommended. If responses consistently take this long, there may be a network or API issue to investigate.
+- **`5000` (5s):** Too short for most cases — the OpenAI API call alone may take longer than this.
+
+---
+
+### Quick Reference Table
+
+| Setting | Type | Default | Range / Notes |
+|---------|------|---------|---------------|
+| `BackendURL` | string | `http://127.0.0.1:8000/signal` | Must match your server address |
+| `MaxSpreadPoints` | int | `50` | 0–∞; lower = safer |
+| `RiskPercent` | double | `1.0` | 0.1–100; typically 0.5–2.0 |
+| `MinRR` | double | `1.5` | 1.0–∞; higher = fewer but better trades |
+| `Timeframe` | enum | `M15` | M1, M5, M15, M30, H1, H4, D1, W1, MN1 |
+| `CandleCount` | int | `200` | 50–1000; AI only sees last 50 |
+| `RefreshHours` | int | `4` | 1–24; controls signal frequency |
+| `MagicNumber` | long | `20250226` | Any unique integer |
+| `Timeout` | int | `10000` | 5000–30000 ms recommended |
 
 ---
 
