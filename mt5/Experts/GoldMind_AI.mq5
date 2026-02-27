@@ -134,8 +134,9 @@ void OnTimer()
    long refreshSec = InpRefreshHours * 3600;
    long retrySec   = 15 * 60;  // 15-minute retry on failure
 
-//--- Use shorter cooldown if last request failed (e.g. no internet)
-   long cooldownSec = g_lastRequestFailed ? retrySec : refreshSec;
+//--- Use PeriodSeconds for the next signal attempt if vetoed.
+   long timeframeSec = PeriodSeconds(InpTimeframe);
+   long cooldownSec  = g_lastRequestFailed ? retrySec : timeframeSec;
 
 //--- Case 1: We have a pending order but it's time to refresh
    if(hasPending && elapsed >= refreshSec)

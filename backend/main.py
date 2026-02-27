@@ -251,7 +251,7 @@ def build_system_prompt(req: SignalRequest, atr_value: float) -> str:
     session = get_session_info(now_utc)
 
     return f"""You are a professional XAUUSD (gold spot) trading analyst operating from Malaysia (UTC+8).
-You specialize in breakout and momentum trading on gold.
+You specialize in breakout and momentum trading on gold. Your goal is to find the best available trading opportunity, even if conditions are not absolutely perfect, provided they meet minimum viability.
 
 ═══ CURRENT MARKET CONTEXT ═══
 - Server time: {session['utc_str']} (Malaysia: {session['myt_str']})
@@ -282,8 +282,8 @@ Before making your decision, mentally perform these analysis steps:
 
 4. STRATEGY DECISION:
    Based on the above, choose the best approach:
-   - BREAKOUT: Place a pending order beyond a key level to catch momentum.
-   - VETO: If the market is choppy, unclear, or conditions are poor — do not trade.
+   - BREAKOUT: Place a pending order beyond a key level to catch momentum. This should be your primary action if there's any reasonable technical setup.
+   - VETO: Only veto if the market is extremely choppy and completely untradable. Avoid vetoing just because conditions aren't perfectly aligned.
 
 ═══ ORDER RULES — follow these exactly ═══
 1. Only propose pending orders (buy_stop or sell_stop), never market orders.
@@ -304,8 +304,8 @@ Before making your decision, mentally perform these analysis steps:
 
 ═══ CONFIDENCE GUIDE ═══
 - 0.80–1.00: Strong conviction — clear trend, key level breakout, good session, multiple confirming factors.
-- 0.60–0.79: Moderate conviction — decent setup but some uncertainty.
-- 0.40–0.59: Weak setup — you should strongly consider vetoing.
+- 0.60–0.79: Moderate conviction — decent setup but some uncertainty. Still a viable trade.
+- 0.40–0.59: Weak setup — acceptable if you want to test a level, but consider vetoing if conditions are extremely poor.
 - Below 0.40: Veto. Do not trade.
 
 Respond ONLY with valid JSON matching the required schema. No extra text."""
@@ -316,7 +316,7 @@ Respond ONLY with valid JSON matching the required schema. No extra text."""
 # ---------------------------------------------------------------------------
 
 def build_user_message(req: SignalRequest) -> str:
-    candle_subset = req.candles[-50:]
+    candle_subset = req.candles[-120:]
 
     # Compute a quick market structure summary from the candles
     if candle_subset:
@@ -340,10 +340,10 @@ def build_user_message(req: SignalRequest) -> str:
 
     lines = [
         "═══ MARKET STRUCTURE SUMMARY ═══",
-        f"Recent 50-candle high: {recent_high}",
-        f"Recent 50-candle low:  {recent_low}",
+        f"Recent 120-candle high: {recent_high}",
+        f"Recent 120-candle low:  {recent_low}",
         f"Current price position: {position_pct:.0f}% of range (0%=at low, 100%=at high)",
-        f"Short-term trend: {trend_dir} (moved {trend_change:+.{req.digits}f} over last 50 candles)",
+        f"Short-term trend: {trend_dir} (moved {trend_change:+.{req.digits}f} over last 120 candles)",
         "",
         "═══ CANDLE DATA (newest last) ═══",
     ]
