@@ -31,7 +31,7 @@ YOU START THE SERVER         THE EA IN MT5              OPENAI (CHATGPT)
 on your computer             runs on XAUUSD chart       analyzes the market
         │                           │                          │
         │    1. EA sends price      │                          │
-        │    data every 4 hours     │                          │
+        │    data every timeframe   │                          │
         │◄──────────────────────────│                          │
         │                           │                          │
         │    2. Server forwards     │                          │
@@ -52,7 +52,7 @@ on your computer             runs on XAUUSD chart       analyzes the market
 ```
 
 **In plain English:**
-- Every **4 hours**, the EA collects the latest candle data (prices) and sends it to your local Python server.
+- Every **candle timeframe** (e.g., 15 minutes), the EA collects the latest candle data (prices) and sends it to your local Python server.
 - The server forwards that data to OpenAI (ChatGPT) for chart analysis.
 - ChatGPT responds with a trading signal: *"place a buy stop here"*, *"place a sell stop here"*, or *"don't trade right now"*.
 - The EA runs the signal through **6 safety filters** (spread, stop level, entry price, SL direction, R:R ratio, lot size). If everything passes, it places a pending order.
@@ -73,8 +73,8 @@ The server sends **two things** to OpenAI:
 - Your **Malaysia timezone (UTC+8)** is included for session awareness
 
 **2. The latest market data** from MT5:
-- Last 50 candles (open, high, low, close, volume for each)
-- **Market structure summary** — 50-candle high/low, price position in range, short-term trend direction
+- Last 120 candles (open, high, low, close, volume for each)
+- **Market structure summary** — 120-candle high/low, price position in range, short-term trend direction
 - Current bid/ask prices and spread
 - ATR value (measures how much the price typically moves)
 
@@ -342,8 +342,8 @@ Order: type=buy_stop entry=2928.50 SL=2923.10 TP=2936.60
 |----------|------------------|
 | Price hits the entry level | Pending order becomes a live trade |
 | 4 hours pass without triggering | EA cancels the order and requests a fresh signal |
-| AI says "don't trade" | EA logs "Signal vetoed" and waits 4 hours |
-| Safety filter rejects the trade | EA waits 4 hours before the next request |
+| AI says "don't trade" | EA logs "Signal vetoed" and waits for the next candle timeframe to check again |
+| Safety filter rejects the trade | EA waits for the next candle timeframe before the next request |
 | Server/API fails | EA retries in **15 minutes** (shorter cooldown) |
 
 ---
@@ -509,13 +509,13 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 **How it works internally:**
 - The EA fetches this many candles from MT5's history using `CopyRates()`.
 - All candles are included in the JSON payload sent to the backend, ordered from oldest to newest.
-- **However**, the backend only sends the **last 50 candles** to OpenAI (to keep token usage reasonable), regardless of how many the EA sends. The full candle set is still used to compute ATR(14) on the server side.
-- More candles = more historical context for ATR calculation, but the AI only sees the most recent 50.
+- **However**, the backend only sends the **last 120 candles** to OpenAI (to keep token usage reasonable), regardless of how many the EA sends. The full candle set is still used to compute ATR(14) on the server side.
+- More candles = more historical context for ATR calculation, but the AI only sees the most recent 120.
 
 **How to set it:**
-- **`50`:** Minimum useful amount. The AI sees all of them, but ATR has limited history.
+- **`120`:** Minimum useful amount. The AI sees all of them, but ATR has limited history.
 - **`200` (default):** Good balance — provides enough history for accurate ATR calculation while keeping the payload size manageable.
-- **`500+`:** More historical context for ATR, but larger payload and slightly slower requests. The AI still only sees the last 50.
+- **`500+`:** More historical context for ATR, but larger payload and slightly slower requests. The AI still only sees the last 120.
 
 **Data coverage examples (with default M15 timeframe):**
 | CandleCount | Time Coverage |
@@ -540,7 +540,7 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 **How it works internally:**
 - The EA runs a timer every 60 seconds via `OnTimer()`.
 - **Case 1 — Pending order exists and refresh time has passed:** The EA cancels the stale pending order and immediately requests a new signal.
-- **Case 2 — No pending order and cooldown has passed:** The EA requests a new signal.
+- **Case 2 — No pending order and cooldown (timeframe or retry limit) has passed:** The EA requests a new signal.
 - **Case 3 — Pending order exists and within refresh window:** The EA does nothing and waits.
 - The refresh interval is also sent to the backend as `expiry_minutes` (= `RefreshHours × 60`), which the AI uses to set the order's expiration time.
 
@@ -735,7 +735,7 @@ After you restart your computer, you need to start two things:
 A: No. This is an AI-assisted trading tool, not a money-printing machine. AI can make wrong predictions. Always test on a **demo account** first, and never risk money you can't afford to lose.
 
 **Q: How much does it cost to run?**
-A: Each signal request costs about $0.01–$0.05 in OpenAI API usage. With signals every 4 hours (max 6 per day), that's roughly $0.06–$0.30 per day, or about **$2–$9 per month**. The EA only makes a request when there's no open position and no pending order, so actual costs may be even lower.
+A: Each signal request costs about $0.01–$0.02 in OpenAI API usage. With frequent polling (e.g. M15), costs can add up if left running 24/7 without placing trades. However, if the EA places an order or holds a position, it will stop polling to save costs.
 
 **Q: Can I run this on a VPS?**
 A: Yes! Run the Python server and MT5 on the same VPS. Change `BackendURL` if they're on different machines.
