@@ -53,11 +53,13 @@ file_handler = RotatingFileHandler(
 )
 file_handler.setFormatter(log_format)
 
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[console_handler, file_handler],
-)
+# Configure the goldmind logger directly (basicConfig won't work
+# reliably because uvicorn pre-configures the root logger).
 logger = logging.getLogger("goldmind")
+logger.setLevel(logging.INFO)
+logger.propagate = False  # Don't duplicate to root logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 # ---------------------------------------------------------------------------
 # Load environment
