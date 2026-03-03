@@ -49,18 +49,18 @@ console_handler.setFormatter(log_format)
 
 # File handler with auto-flush
 file_handler = RotatingFileHandler(
-    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8",
+    delay=True,  # Don't open file until first write (avoids lock conflict on reload)
 )
 file_handler.setFormatter(log_format)
-
-# Use force=True to guarantee handlers are set even on uvicorn reload
+# Set up root logger with force=True (works reliably under uvicorn reload)
 logging.basicConfig(
     level=logging.INFO,
     handlers=[console_handler, file_handler],
-    force=True,   # <-- key: clears & replaces existing handlers on reload
+    force=True,
 )
-logger = logging.getLogger("goldmind")
-logger.setLevel(logging.INFO)
+# Use the root logger directly — avoids all named-logger propagation issues
+logger = logging.getLogger()
 
 # Startup test — verify file logging works
 logger.info("=" * 60)
@@ -448,6 +448,7 @@ def build_user_message(req: SignalRequest) -> str:
 
 @app.get("/health")
 async def health():
+    logger.info("Health check requested")
     return {"status": "ok"}
 
 
@@ -578,6 +579,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=False,  # Disabled: reload subprocess breaks file logging
         log_level="info",
     )
