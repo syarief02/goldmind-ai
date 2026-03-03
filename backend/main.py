@@ -48,7 +48,13 @@ console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(log_format)
 
 # File handler — rotates at 5 MB, keeps last 5 log files
-file_handler = RotatingFileHandler(
+# Subclass to force flush after every write (uvicorn reload can lose buffered data)
+class FlushingRotatingFileHandler(RotatingFileHandler):
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+file_handler = FlushingRotatingFileHandler(
     LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
 )
 file_handler.setFormatter(log_format)
@@ -58,8 +64,16 @@ file_handler.setFormatter(log_format)
 logger = logging.getLogger("goldmind")
 logger.setLevel(logging.INFO)
 logger.propagate = False  # Don't duplicate to root logger
+# Clear stale handlers on uvicorn reload, then re-attach
+logger.handlers.clear()
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+# Startup test — verify file logging works
+logger.info("="*60)
+logger.info("GoldMind AI logger initialized — file logging active")
+logger.info(f"Log file: {LOG_FILE}")
+logger.info("="*60)
 
 # ---------------------------------------------------------------------------
 # Load environment
