@@ -7,7 +7,9 @@ trading signal using Structured Outputs (JSON schema enforcement).
 """
 
 import os
+import sys
 import time
+import logging
 import traceback
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -17,6 +19,25 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from openai import OpenAI
 from pydantic import BaseModel, Field
+
+# ---------------------------------------------------------------------------
+# Force unbuffered stdout so prints appear immediately in PowerShell
+# ---------------------------------------------------------------------------
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+else:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+
+# ---------------------------------------------------------------------------
+# Configure logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-5s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("goldmind")
 
 # ---------------------------------------------------------------------------
 # Load environment
@@ -35,19 +56,19 @@ app = FastAPI(title="GoldMind AI Signal Backend", version="1.0.0")
 @app.on_event("startup")
 async def startup_banner():
     key_preview = OPENAI_API_KEY[:8] + "..." + OPENAI_API_KEY[-4:] if len(OPENAI_API_KEY) > 12 else "NOT SET"
-    print("")
-    print("=" * 60)
-    print("  🤖 GoldMind AI Signal Backend")
-    print("=" * 60)
-    print(f"  Model:    {OPENAI_MODEL}")
-    print(f"  API Key:  {key_preview}")
-    print(f"  Server:   http://127.0.0.1:8000")
-    print(f"  Health:   http://127.0.0.1:8000/health")
-    print(f"  Signal:   http://127.0.0.1:8000/signal  (POST)")
-    print("=" * 60)
-    print("  Waiting for signal requests from MT5 EA...")
-    print("=" * 60)
-    print("")
+    print("", flush=True)
+    print("=" * 60, flush=True)
+    print("  🤖 GoldMind AI Signal Backend", flush=True)
+    print("=" * 60, flush=True)
+    print(f"  Model:    {OPENAI_MODEL}", flush=True)
+    print(f"  API Key:  {key_preview}", flush=True)
+    print(f"  Server:   http://127.0.0.1:8000", flush=True)
+    print(f"  Health:   http://127.0.0.1:8000/health", flush=True)
+    print(f"  Signal:   http://127.0.0.1:8000/signal  (POST)", flush=True)
+    print("=" * 60, flush=True)
+    print("  Waiting for signal requests from MT5 EA...", flush=True)
+    print("=" * 60, flush=True)
+    print("", flush=True)
 
 # ---------------------------------------------------------------------------
 # Pydantic models — Request
@@ -369,27 +390,29 @@ async def health():
 @app.post("/signal", response_model=SignalResponse)
 async def generate_signal(req: SignalRequest):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    print(f"\n{'─' * 60}")
-    print(f"📥 [{now}] Signal request received")
-    print(f"   Symbol: {req.symbol}  Timeframe: {req.timeframe}")
-    print(f"   Bid: {req.bid}  Ask: {req.ask}  Spread: {req.spread_points}pts")
-    print(f"   Candles: {len(req.candles)}  ATR: {req.atr}")
-    print(f"   Model: {OPENAI_MODEL}")
+    logger.info("")
+    logger.info("─" * 60)
+    logger.info(f"📥 [{now}] Signal request received")
+    logger.info(f"   Symbol: {req.symbol}  Timeframe: {req.timeframe}")
+    logger.info(f"   Bid: {req.bid}  Ask: {req.ask}  Spread: {req.spread_points}pts")
+    logger.info(f"   Candles: {len(req.candles)}  ATR: {req.atr}")
+    logger.info(f"   Model: {OPENAI_MODEL}")
 
     # 1. Compute ATR if not provided
     atr_value = req.atr if req.atr is not None else compute_atr(req.candles)
 
     # 2. Quick spread veto (server-side too, belt-and-suspenders)
     if req.spread_points > req.constraints.max_spread_points:
-        print(f"   🚫 VETO: Spread {req.spread_points} > max {req.constraints.max_spread_points}")
-        print(f"{'─' * 60}")
+        logger.warning(f"   🚫 VETO: Spread {req.spread_points} > max {req.constraints.max_spread_points}")
+        logger.info("─" * 60)
         return veto_response(req.symbol, f"spread {req.spread_points} > max {req.constraints.max_spread_points}")
 
     # 3. Call OpenAI with Structured Outputs
     try:
         client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
 
-        print(f"   ⏳ Calling OpenAI ({OPENAI_MODEL})...")
+        logger.info(f"   ⏳ Calling OpenAI ({OPENAI_MODEL})...")
+        sys.stdout.flush()
         start_time = time.time()
 
         response = client.chat.completions.create(
@@ -409,8 +432,8 @@ async def generate_signal(req: SignalRequest):
         # Token usage
         usage = response.usage
         if usage:
-            print(f"   📊 Tokens: {usage.prompt_tokens} in + {usage.completion_tokens} out = {usage.total_tokens} total")
-        print(f"   ⏱️  Response time: {elapsed:.1f}s")
+            logger.info(f"   📊 Tokens: {usage.prompt_tokens} in + {usage.completion_tokens} out = {usage.total_tokens} total")
+        logger.info(f"   ⏱️  Response time: {elapsed:.1f}s")
 
         # Extract the text output from the response
         raw_json = response.choices[0].message.content
@@ -420,20 +443,20 @@ async def generate_signal(req: SignalRequest):
 
         # Log the result
         if signal.veto:
-            print(f"   🚫 VETO: {signal.veto_reason}")
+            logger.warning(f"   🚫 VETO: {signal.veto_reason}")
         else:
-            print(f"   ✅ Signal: {signal.bias.value.upper()} (confidence: {signal.confidence:.0%})")
-            print(f"   📋 Order: {signal.order.type.value}")
-            print(f"      Entry: {signal.order.entry}  SL: {signal.order.sl}  TP: {signal.order.tp}")
-            print(f"      Comment: {signal.order.comment}")
-        print(f"{'─' * 60}")
+            logger.info(f"   ✅ Signal: {signal.bias.value.upper()} (confidence: {signal.confidence:.0%})")
+            logger.info(f"   📋 Order: {signal.order.type.value}")
+            logger.info(f"      Entry: {signal.order.entry}  SL: {signal.order.sl}  TP: {signal.order.tp}")
+            logger.info(f"      Comment: {signal.order.comment}")
+        logger.info("─" * 60)
 
         return signal
 
     except Exception as e:
-        print(f"   ❌ ERROR: {e}")
+        logger.error(f"   ❌ ERROR: {e}")
         traceback.print_exc()
-        print(f"{'─' * 60}")
+        logger.info("─" * 60)
         return veto_response(req.symbol, "model_unavailable")
 
 
@@ -443,4 +466,10 @@ async def generate_signal(req: SignalRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
