@@ -473,9 +473,16 @@ void RequestAndPlace()
 //--- Apply safety filters and place order
    if(PlaceOrder(orderType, entry, sl, tp, expiryMin, comment))
      {
-      g_lastSignalTime = TimeCurrent();
-      SaveState();
+      Print(">>> Order placed successfully!");
      }
+   else
+     {
+      Print(">>> Order rejected by safety filters — will retry at next signal window");
+     }
+
+//--- Always update signal time (prevents API spam on repeated failures)
+   g_lastSignalTime = TimeCurrent();
+   SaveState();
   }
 
 //+------------------------------------------------------------------+

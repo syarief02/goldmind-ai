@@ -525,6 +525,30 @@ async def generate_signal(req: SignalRequest):
             # Parse into our Pydantic model for validation
             signal = SignalResponse.model_validate_json(raw_json)
 
+            # --- FIX Issue 3: Override timestamp with actual server time ---
+            signal.timestamp_utc = datetime.now(timezone.utc).isoformat()
+
+            # --- FIX Issue 1: Server-side R:R auto-correction ---
+            if not signal.veto and signal.order.type.value != "none":
+                entry = signal.order.entry
+                sl = signal.order.sl
+                tp = signal.order.tp
+                sl_dist = abs(entry - sl)
+                tp_dist = abs(tp - entry)
+                rr = tp_dist / sl_dist if sl_dist > 0 else 0
+
+                if rr < req.constraints.min_rr and sl_dist > 0:
+                    # Auto-correct TP to meet minimum R:R
+                    required_tp_dist = sl_dist * req.constraints.min_rr
+                    if signal.order.type.value == "buy_stop":
+                        new_tp = round(entry + required_tp_dist, req.digits)
+                    else:
+                        new_tp = round(entry - required_tp_dist, req.digits)
+
+                    logger.warning(f"   ⚠️  R:R {rr:.2f} < min {req.constraints.min_rr} — auto-correcting TP")
+                    logger.info(f"      TP: {tp} → {new_tp} (R:R: {rr:.2f} → {req.constraints.min_rr:.2f})")
+                    signal.order.tp = new_tp
+
             # Log the result
             if signal.veto:
                 logger.warning(f"   🚫 VETO: {signal.veto_reason}")
