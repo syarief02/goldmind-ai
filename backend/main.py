@@ -16,7 +16,8 @@ from enum import Enum
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -29,13 +30,32 @@ else:
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 
 # ---------------------------------------------------------------------------
-# Configure logging
+# Configure logging (console + file)
 # ---------------------------------------------------------------------------
+from logging.handlers import RotatingFileHandler
+
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "goldmind.log")
+
+log_format = logging.Formatter(
+    "%(asctime)s | %(levelname)-5s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(log_format)
+
+# File handler — rotates at 5 MB, keeps last 5 log files
+file_handler = RotatingFileHandler(
+    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
+file_handler.setFormatter(log_format)
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)-5s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler(sys.stdout)],
+    handlers=[console_handler, file_handler],
 )
 logger = logging.getLogger("goldmind")
 
@@ -45,9 +65,44 @@ logger = logging.getLogger("goldmind")
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-5")
 
 app = FastAPI(title="GoldMind AI Signal Backend", version="1.0.0")
+
+
+# ---------------------------------------------------------------------------
+# Middleware — log every incoming request and outgoing response
+# ---------------------------------------------------------------------------
+class RequestResponseLogger(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # --- Incoming request ---
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        body_size = request.headers.get("content-length", "?")
+        logger.info("")
+        logger.info("━" * 60)
+        logger.info(f"📨 [{now}] INCOMING REQUEST")
+        logger.info(f"   {request.method} {request.url.path}")
+        logger.info(f"   From: {request.client.host}:{request.client.port}" if request.client else "   From: unknown")
+        logger.info(f"   Content-Length: {body_size} bytes")
+        sys.stdout.flush()
+
+        # --- Process request ---
+        start = time.time()
+        response = await call_next(request)
+        elapsed = time.time() - start
+
+        # --- Outgoing response ---
+        status_emoji = "✅" if response.status_code < 400 else "⚠️" if response.status_code < 500 else "❌"
+        logger.info(f"📤 [{now}] OUTGOING RESPONSE")
+        logger.info(f"   {status_emoji} Status: {response.status_code}")
+        logger.info(f"   ⏱️  Processed in: {elapsed:.2f}s")
+        logger.info("━" * 60)
+        sys.stdout.flush()
+
+        return response
+
+app.add_middleware(RequestResponseLogger)
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +115,7 @@ async def startup_banner():
     print("=" * 60, flush=True)
     print("  🤖 GoldMind AI Signal Backend", flush=True)
     print("=" * 60, flush=True)
-    print(f"  Model:    {OPENAI_MODEL}", flush=True)
+    print(f"  Model:    {OPENAI_MODEL} (fallback: {FALLBACK_MODEL})", flush=True)
     print(f"  API Key:  {key_preview}", flush=True)
     print(f"  Server:   http://127.0.0.1:8000", flush=True)
     print(f"  Health:   http://127.0.0.1:8000/health", flush=True)
@@ -407,57 +462,77 @@ async def generate_signal(req: SignalRequest):
         logger.info("─" * 60)
         return veto_response(req.symbol, f"spread {req.spread_points} > max {req.constraints.max_spread_points}")
 
-    # 3. Call OpenAI with Structured Outputs
-    try:
-        client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
+    # 3. Call OpenAI with Structured Outputs (with fallback)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
+    models_to_try = [OPENAI_MODEL]
+    if FALLBACK_MODEL and FALLBACK_MODEL != OPENAI_MODEL:
+        models_to_try.append(FALLBACK_MODEL)
 
-        logger.info(f"   ⏳ Calling OpenAI ({OPENAI_MODEL})...")
-        sys.stdout.flush()
-        start_time = time.time()
+    messages = [
+        {"role": "system", "content": build_system_prompt(req, atr_value)},
+        {"role": "user", "content": build_user_message(req)},
+    ]
 
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": build_system_prompt(req, atr_value)},
-                {"role": "user", "content": build_user_message(req)},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": SIGNAL_JSON_SCHEMA,
-            },
-        )
+    last_error = None
+    for model in models_to_try:
+        try:
+            is_fallback = model != OPENAI_MODEL
+            if is_fallback:
+                logger.warning(f"   🔄 Falling back to {model}...")
+            else:
+                logger.info(f"   ⏳ Calling OpenAI ({model})...")
+            sys.stdout.flush()
+            start_time = time.time()
 
-        elapsed = time.time() - start_time
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": SIGNAL_JSON_SCHEMA,
+                },
+            )
 
-        # Token usage
-        usage = response.usage
-        if usage:
-            logger.info(f"   📊 Tokens: {usage.prompt_tokens} in + {usage.completion_tokens} out = {usage.total_tokens} total")
-        logger.info(f"   ⏱️  Response time: {elapsed:.1f}s")
+            elapsed = time.time() - start_time
 
-        # Extract the text output from the response
-        raw_json = response.choices[0].message.content
+            # Token usage
+            usage = response.usage
+            if usage:
+                logger.info(f"   📊 Tokens: {usage.prompt_tokens} in + {usage.completion_tokens} out = {usage.total_tokens} total")
+            logger.info(f"   ⏱️  Response time: {elapsed:.1f}s")
+            if is_fallback:
+                logger.info(f"   ℹ️  Used fallback model: {model}")
 
-        # Parse into our Pydantic model for validation
-        signal = SignalResponse.model_validate_json(raw_json)
+            # Extract the text output from the response
+            raw_json = response.choices[0].message.content
 
-        # Log the result
-        if signal.veto:
-            logger.warning(f"   🚫 VETO: {signal.veto_reason}")
-        else:
-            logger.info(f"   ✅ Signal: {signal.bias.value.upper()} (confidence: {signal.confidence:.0%})")
-            logger.info(f"   📋 Order: {signal.order.type.value}")
-            logger.info(f"      Entry: {signal.order.entry}  SL: {signal.order.sl}  TP: {signal.order.tp}")
-            logger.info(f"      Comment: {signal.order.comment}")
-        logger.info("─" * 60)
+            # Parse into our Pydantic model for validation
+            signal = SignalResponse.model_validate_json(raw_json)
 
-        return signal
+            # Log the result
+            if signal.veto:
+                logger.warning(f"   🚫 VETO: {signal.veto_reason}")
+            else:
+                logger.info(f"   ✅ Signal: {signal.bias.value.upper()} (confidence: {signal.confidence:.0%})")
+                logger.info(f"   📋 Order: {signal.order.type.value}")
+                logger.info(f"      Entry: {signal.order.entry}  SL: {signal.order.sl}  TP: {signal.order.tp}")
+                logger.info(f"      Comment: {signal.order.comment}")
+            logger.info("─" * 60)
 
-    except Exception as e:
-        logger.error(f"   ❌ ERROR: {e}")
-        traceback.print_exc()
-        logger.info("─" * 60)
-        return veto_response(req.symbol, "model_unavailable")
+            return signal
+
+        except Exception as e:
+            last_error = e
+            logger.error(f"   ❌ {model} failed: {e}")
+            if not is_fallback and len(models_to_try) > 1:
+                logger.info(f"   ↪ Will try fallback model...")
+            continue
+
+    # All models failed
+    logger.error(f"   ❌ All models failed. Last error: {last_error}")
+    traceback.print_exc()
+    logger.info("─" * 60)
+    return veto_response(req.symbol, "model_unavailable")
 
 
 # ---------------------------------------------------------------------------
