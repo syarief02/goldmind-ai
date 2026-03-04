@@ -41,7 +41,7 @@ string         GV_PREFIX        = "GoldMind_"; // GlobalVariable prefix
 //| LICENSE EXPIRATION — Change the date below to extend the license  |
 //| Format: D'YYYY.MM.DD HH:MM:SS'                                   |
 //+------------------------------------------------------------------+
-datetime       LICENSE_EXPIRY = D'2026.03.31 23:59:59';   // <── EDIT THIS DATE TO EXTEND
+datetime       LICENSE_EXPIRY = D'2026.03.28 23:59:59';   // <── EDIT THIS DATE TO EXTEND
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
