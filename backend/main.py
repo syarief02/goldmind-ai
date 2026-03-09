@@ -18,7 +18,8 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from openai import OpenAI
+import openai
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -473,7 +474,7 @@ async def generate_signal(req: SignalRequest):
         return veto_response(req.symbol, f"spread {req.spread_points} > max {req.constraints.max_spread_points}")
 
     # 3. Call OpenAI with Structured Outputs (with fallback)
-    client = OpenAI(api_key=OPENAI_API_KEY, timeout=30.0)
+    client = AsyncOpenAI(api_key=OPENAI_API_KEY, timeout=60.0)
     models_to_try = [OPENAI_MODEL]
     if FALLBACK_MODEL and FALLBACK_MODEL != OPENAI_MODEL:
         models_to_try.append(FALLBACK_MODEL)
@@ -494,7 +495,7 @@ async def generate_signal(req: SignalRequest):
             sys.stdout.flush()
             start_time = time.time()
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model,
                 messages=messages,
                 response_format={
@@ -554,6 +555,13 @@ async def generate_signal(req: SignalRequest):
             logger.info("─" * 60)
 
             return signal
+
+        except openai.APITimeoutError as e:
+            last_error = e
+            logger.error(f"   ⏰ {model} timed out after 60s: {e}")
+            if not is_fallback and len(models_to_try) > 1:
+                logger.info(f"   ↪ Will try fallback model...")
+            continue
 
         except Exception as e:
             last_error = e
