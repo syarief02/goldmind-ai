@@ -6,6 +6,7 @@ sends it to OpenAI for analysis, and returns a structured
 trading signal using Structured Outputs (JSON schema enforcement).
 """
 
+import asyncio
 import os
 import sys
 import time
@@ -495,13 +496,16 @@ async def generate_signal(req: SignalRequest):
             sys.stdout.flush()
             start_time = time.time()
 
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": SIGNAL_JSON_SCHEMA,
-                },
+            response = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": SIGNAL_JSON_SCHEMA,
+                    },
+                ),
+                timeout=90.0,  # Hard 90s deadline — force-cancel if OpenAI hangs
             )
 
             elapsed = time.time() - start_time
@@ -556,9 +560,9 @@ async def generate_signal(req: SignalRequest):
 
             return signal
 
-        except openai.APITimeoutError as e:
+        except (openai.APITimeoutError, asyncio.TimeoutError) as e:
             last_error = e
-            logger.error(f"   ⏰ {model} timed out after 60s: {e}")
+            logger.error(f"   ⏰ {model} timed out after 90s: {e}")
             if not is_fallback and len(models_to_try) > 1:
                 logger.info(f"   ↪ Will try fallback model...")
             continue
