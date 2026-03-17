@@ -244,13 +244,13 @@ string BuildRequestJSON()
 
 //--- Get candle data for multiple timeframes
    int limit = 60; // 60 candles per timeframe is plenty for AI context and keeps payload small
-   
+
    string m5Candles = StringBuildCandlesJSON(PERIOD_M5, limit);
    string m15Candles = StringBuildCandlesJSON(PERIOD_M15, limit);
    string m30Candles = StringBuildCandlesJSON(PERIOD_M30, limit);
    string h1Candles = StringBuildCandlesJSON(PERIOD_H1, limit);
    string h4Candles = StringBuildCandlesJSON(PERIOD_H4, limit);
-   
+
    if(m5Candles == "" || m15Candles == "" || m30Candles == "" || h1Candles == "" || h4Candles == "")
      {
       Print("ERROR: Failed to build candles JSON for one or more timeframes");
@@ -279,7 +279,7 @@ string BuildRequestJSON()
    string json = "{";
    json += "\"symbol\":\"" + _Symbol + "\",";
    json += "\"timeframe\":\"" + tfStr + "\",";
-   json += "\"server_time_utc\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS) + "\",";
+   json += "\"server_time_utc\":\"" + TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + "\",";
    json += "\"bid\":" + DoubleToString(bid, digits) + ",";
    json += "\"ask\":" + DoubleToString(ask, digits) + ",";
    json += "\"spread_points\":" + IntegerToString(spread) + ",";
@@ -306,23 +306,23 @@ string StringBuildCandlesJSON(ENUM_TIMEFRAMES tf, int count)
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
    int copied = CopyRates(_Symbol, tf, 0, count, rates);
-   
+
    if(copied <= 0)
      {
       Print("ERROR: CopyRates failed for timeframe ", EnumToString(tf), ", copied=", copied);
       return "";
      }
-     
+
    int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
    string candles = "";
-   
-   // Reverse so oldest is first (server expects chronological)
+
+// Reverse so oldest is first (server expects chronological)
    for(int i = copied - 1; i >= 0; i--)
      {
       if(candles != "")
          candles += ",";
       candles += "{";
-      candles += "\"time\":\"" + TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES|TIME_SECONDS) + "\",";
+      candles += "\"time\":\"" + TimeToString(rates[i].time, TIME_DATE | TIME_MINUTES | TIME_SECONDS) + "\",";
       candles += "\"open\":" + DoubleToString(rates[i].open, digits) + ",";
       candles += "\"high\":" + DoubleToString(rates[i].high, digits) + ",";
       candles += "\"low\":" + DoubleToString(rates[i].low, digits) + ",";
@@ -330,7 +330,7 @@ string StringBuildCandlesJSON(ENUM_TIMEFRAMES tf, int count)
       candles += "\"volume\":" + IntegerToString(rates[i].tick_volume);
       candles += "}";
      }
-     
+
    return candles;
   }
 
