@@ -1,6 +1,6 @@
 # 🤖 GoldMind AI — MT5 Trading System
 
-> **What is this?** An AI-powered trading tool that uses ChatGPT to analyze gold (XAUUSD) price charts and automatically place trades in MetaTrader 5. It runs entirely on your own computer — just start the Python server and the EA in MT5.
+> **What is this?** An AI-powered trading tool that uses OpenAI GPT to analyze gold (XAUUSD) price charts across multiple timeframes and automatically place trades in MetaTrader 5. It runs entirely on your own computer — just start the Python server and the EA in MT5.
 
 ---
 
@@ -58,6 +58,7 @@ on your computer             runs on XAUUSD chart       analyzes the market
 - The EA runs the signal through **6 safety filters** (spread, stop level, entry price, SL direction, R:R ratio, lot size). If everything passes, it places a pending order.
 - After 4 hours, if the pending order hasn't been triggered, the EA cancels it and requests a fresh signal.
 - If the EA already has an open position, it **skips** the request entirely to save API costs.
+- The backend supports **automatic model fallback** — if the primary model fails, it retries with a secondary model.
 
 ### 🧠 How the AI Analysis Works
 
@@ -72,9 +73,9 @@ The server sends **two things** to OpenAI:
 - Use ATR (volatility indicator) for setting entry buffers, stop loss, and take profit distances
 - Your **Malaysia timezone (UTC+8)** is included for session awareness
 
-**2. The latest market data** from MT5:
-- Last 120 candles (open, high, low, close, volume for each)
-- **Market structure summary** — 120-candle high/low, price position in range, short-term trend direction
+**2. The latest market data** from MT5 (multi-timeframe):
+- Candle data across multiple timeframes (M5, M15, M30, H1, H4) — 60 candles per timeframe
+- **Market structure summary per timeframe** — 60-candle high/low, price position in range, short-term trend direction
 - Current bid/ask prices and spread
 - ATR value (measures how much the price typically moves)
 
@@ -183,7 +184,8 @@ type .env
 You should see something like:
 ```
 OPENAI_API_KEY=sk-proj-xxxxx...your-key-here...
-OPENAI_MODEL=gpt-4o-2024-08-06
+OPENAI_MODEL=gpt-5.2
+FALLBACK_MODEL=gpt-5
 ```
 If the key is missing, create the file:
 ```
@@ -509,8 +511,8 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 **How it works internally:**
 - The EA fetches this many candles from MT5's history using `CopyRates()`.
 - All candles are included in the JSON payload sent to the backend, ordered from oldest to newest.
-- **However**, the backend only sends the **last 120 candles** to OpenAI (to keep token usage reasonable), regardless of how many the EA sends. The full candle set is still used to compute ATR(14) on the server side.
-- More candles = more historical context for ATR calculation, but the AI only sees the most recent 120.
+- **However**, the backend only sends the **last 60 candles per timeframe** to OpenAI (to keep token usage reasonable), regardless of how many the EA sends. The full candle set is still used to compute ATR(14) on the server side.
+- More candles = more historical context for ATR calculation, but the AI only sees the most recent 60 per timeframe.
 
 **How to set it:**
 - **`120`:** Minimum useful amount. The AI sees all of them, but ATR has limited history.
@@ -606,7 +608,7 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 | `RiskPercent` | double | `1.0` | 0.1–100; typically 0.5–2.0 |
 | `MinRR` | double | `1.5` | 1.0–∞; higher = fewer but better trades |
 | `Timeframe` | enum | `M15` | M1, M5, M15, M30, H1, H4, D1, W1, MN1 |
-| `CandleCount` | int | `200` | 50–1000; AI only sees last 50 |
+| `CandleCount` | int | `200` | 50–1000; AI only sees last 60 per TF |
 | `RefreshHours` | int | `4` | 1–24; controls signal frequency |
 | `MagicNumber` | long | `20250226` | Any unique integer |
 | `Timeout` | int | `10000` | 5000–30000 ms recommended |
@@ -720,7 +722,7 @@ After you restart your computer, you need to start two things:
 **How to fix:**
 1. Check if you have **API credits** at https://platform.openai.com/settings/organization/billing/overview
 2. Check the server terminal for error details (look for red text)
-3. Make sure the OpenAI model `gpt-4o-2024-08-06` is available on your account
+3. Make sure the OpenAI model configured in `.env` is available on your account (default: `gpt-5.2`)
 4. Try restarting the server (Ctrl+C, then `python main.py`)
 
 ### Problem: "REJECTED: R:R 1.02 < min 1.5"
@@ -751,9 +753,10 @@ A: Yes! Edit `OPENAI_MODEL` in `backend\.env`. The file includes commented optio
 
 | Model | Speed | Quality | Cost per signal |
 |-------|-------|---------|----------------|
-| `gpt-4o-2024-08-06` | ⚡ Fast | Great | ~$0.01–$0.05 (default) |
+| `gpt-5.2` | ⚡ Fast | Great | ~$0.01–$0.05 (default) |
 | `gpt-5-mini` | ⚡ Fast | Very good | ~$0.02–$0.08 |
 | `gpt-5` | 🐢 Slower | Best | ~$0.05–$0.15 |
+| `gpt-4o-2024-08-06` | ⚡ Fast | Good | ~$0.01–$0.03 |
 
 To switch: open `backend\.env`, comment out the current model line with `#`, and uncomment the one you want. Then restart the server.
 
@@ -770,7 +773,8 @@ goldmind-ai/
 │   ├── main.py                     ← Server code (FastAPI + OpenAI integration)
 │   ├── requirements.txt            ← Python package dependencies
 │   ├── .env.example                ← Template for API key configuration
-│   └── .env                        ← Your actual API key (never share this!)
+│   ├── .env                        ← Your actual API key (never share this!)
+│   └── logs/                       ← Auto-generated log files (goldmind.log)
 ├── mt5/                            ← MetaTrader 5 files
 │   ├── Include/
 │   │   └── JASONNode.mqh           ← JSON parser library (→ MQL5\Include\)
