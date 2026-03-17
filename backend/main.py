@@ -477,7 +477,12 @@ async def generate_signal(req: SignalRequest):
     logger.info(f"📥 [{now}] Signal request received")
     logger.info(f"   Symbol: {req.symbol}  Timeframe: {req.timeframe}")
     logger.info(f"   Bid: {req.bid}  Ask: {req.ask}  Spread: {req.spread_points}pts")
-    logger.info(f"   Candles: {len(req.candles)}  ATR: {req.atr}")
+    # Log per-timeframe candle counts
+    tf_summary = ", ".join(f"{tf}={len(c)}" for tf, c in req.candles.items())
+    total_candles = sum(len(c) for c in req.candles.values())
+    logger.info(f"   Candles: {total_candles} total across {len(req.candles)} timeframes")
+    logger.info(f"   Timeframes: {tf_summary}")
+    logger.info(f"   ATR: {req.atr}")
     logger.info(f"   Model: {OPENAI_MODEL}")
 
     # 1. Compute ATR if not provided
