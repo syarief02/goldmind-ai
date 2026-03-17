@@ -165,7 +165,7 @@ class SignalRequest(BaseModel):
     spread_points: int
     digits: int = 2
     point: float = 0.01
-    candles: list[CandleData]
+    candles: dict[str, list[CandleData]]
     atr: Optional[float] = None
     constraints: Constraints = Constraints()
 
@@ -209,15 +209,26 @@ class SignalResponse(BaseModel):
 # Helper: compute ATR from candles
 # ---------------------------------------------------------------------------
 
-def compute_atr(candles: list[CandleData], period: int = 14) -> float:
-    """Compute Average True Range from candle list."""
-    if len(candles) < 2:
+def compute_atr(candles: dict[str, list[CandleData]], period: int = 14) -> float:
+    """Compute Average True Range from candle list (defaults to H1 or M15)."""
+    # Pick a timeframe to calculate ATR, prefer H1, else M15, else the first available
+    tf_to_use = None
+    if "H1" in candles and candles["H1"]:
+        tf_to_use = "H1"
+    elif "M15" in candles and candles["M15"]:
+        tf_to_use = "M15"
+    elif candles:
+        tf_to_use = list(candles.keys())[0]
+        
+    if not tf_to_use or len(candles[tf_to_use]) < 2:
         return 0.0
+        
+    c_list = candles[tf_to_use]
     trs: list[float] = []
-    for i in range(1, len(candles)):
-        high = candles[i].high
-        low = candles[i].low
-        prev_close = candles[i - 1].close
+    for i in range(1, len(c_list)):
+        high = c_list[i].high
+        low = c_list[i].low
+        prev_close = c_list[i - 1].close
         tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
         trs.append(tr)
     if not trs:
@@ -344,7 +355,7 @@ You specialize in breakout and momentum trading on gold. Your goal is to find th
 - Server time: {session['utc_str']} (Malaysia: {session['myt_str']})
 - Trading session: {session['session']} — {session['liquidity']}
 - Current price: Bid={req.bid}, Ask={req.ask}, Spread={req.spread_points} pts
-- Timeframe: {req.timeframe} ({len(req.candles)} candles provided)
+- Primary Timeframe: {req.timeframe} (Multi-timeframe data provided below)
 - ATR(14): {atr_value:.5f} (recent average volatility per candle)
 
 ═══ ANALYSIS FRAMEWORK ═══
@@ -403,10 +414,16 @@ Respond ONLY with valid JSON matching the required schema. No extra text."""
 # ---------------------------------------------------------------------------
 
 def build_user_message(req: SignalRequest) -> str:
-    candle_subset = req.candles[-120:]
+    lines = []
+    
+    # Process each timeframe
+    for tf, tf_candles in req.candles.items():
+        if not tf_candles:
+            continue
+            
+        candle_subset = tf_candles[-60:] # Limit to 60 candles per timeframe for context
 
-    # Compute a quick market structure summary from the candles
-    if candle_subset:
+        # Compute a quick market structure summary from the candles
         highs = [c.high for c in candle_subset]
         lows = [c.low for c in candle_subset]
         recent_high = max(highs)
@@ -420,25 +437,23 @@ def build_user_message(req: SignalRequest) -> str:
         last_close = candle_subset[-1].close
         trend_change = last_close - first_close
         trend_dir = "bullish" if trend_change > 0 else "bearish" if trend_change < 0 else "flat"
-    else:
-        recent_high = recent_low = position_pct = 0
-        trend_dir = "unknown"
-        trend_change = 0
 
-    lines = [
-        "═══ MARKET STRUCTURE SUMMARY ═══",
-        f"Recent 120-candle high: {recent_high}",
-        f"Recent 120-candle low:  {recent_low}",
-        f"Current price position: {position_pct:.0f}% of range (0%=at low, 100%=at high)",
-        f"Short-term trend: {trend_dir} (moved {trend_change:+.{req.digits}f} over last 120 candles)",
-        "",
-        "═══ CANDLE DATA (newest last) ═══",
-    ]
-    for c in candle_subset:
-        lines.append(
-            f"  {c.time} O={c.open} H={c.high} L={c.low} C={c.close} V={c.volume}"
-        )
-    lines.append(f"\nBid={req.bid} Ask={req.ask} Spread={req.spread_points}pts")
+        lines.extend([
+            f"═══ {tf} MARKET STRUCTURE SUMMARY ═══",
+            f"Recent 60-candle high: {recent_high}",
+            f"Recent 60-candle low:  {recent_low}",
+            f"Current price position: {position_pct:.0f}% of range (0%=at low, 100%=at high)",
+            f"Short-term trend: {trend_dir} (moved {trend_change:+.{req.digits}f} over last 60 candles)",
+            "",
+            f"═══ {tf} CANDLE DATA (newest last) ═══",
+        ])
+        for c in candle_subset:
+            lines.append(
+                f"  {c.time} O={c.open} H={c.high} L={c.low} C={c.close} V={c.volume}"
+            )
+        lines.append("")
+
+    lines.append(f"Bid={req.bid} Ask={req.ask} Spread={req.spread_points}pts")
     lines.append(f"Digits={req.digits} Point={req.point}")
     lines.append("\nAnalyze the market using the framework above and produce the trading signal.")
     return "\n".join(lines)
