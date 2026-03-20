@@ -55,7 +55,7 @@ on your computer             runs on XAUUSD chart       analyzes the market
 - Every **candle timeframe** (e.g., 15 minutes), the EA collects the latest candle data (prices) and sends it to your local Python server.
 - The server forwards that data to OpenAI (ChatGPT) for chart analysis.
 - ChatGPT responds with a trading signal: *"place a buy stop here"*, *"place a sell stop here"*, or *"don't trade right now"*.
-- The EA runs the signal through **6 safety filters** (spread, stop level, entry price, SL direction, R:R ratio, lot size). If everything passes, it places a pending order.
+- The EA runs the signal through **5 safety filters** (spread, stop level, entry price, SL direction, lot size). If everything passes, it places a pending order using the AI's original TP as-is.
 - After 4 hours, if the pending order hasn't been triggered, the EA cancels it and requests a fresh signal.
 - If the EA already has an open position, it **skips** the request entirely to save API costs.
 - The backend supports **automatic model fallback** — if the primary model fails, it retries with a secondary model.
@@ -95,7 +95,7 @@ The server sends **two things** to OpenAI:
 }
 ```
 
-The EA then runs the signal through **6 safety filters** before placing any order:
+The EA then runs the signal through **5 safety filters** before placing any order:
 
 | # | Filter | Question |
 |---|--------|----------|
@@ -103,10 +103,9 @@ The EA then runs the signal through **6 safety filters** before placing any orde
 | 2 | Stop level check | Does the broker allow this entry distance? |
 | 3 | Entry price validation | Is entry above/below the current price? |
 | 4 | SL direction check | Is the stop loss on the correct side? |
-| 5 | Risk-reward ratio | Is the potential profit worth the risk? |
-| 6 | Lot size calculation | How much to risk based on your account balance? |
+| 5 | Lot size calculation | How much to risk based on your account balance? |
 
-Only if **all 6 filters pass** will the EA place the pending order.
+Only if **all 5 filters pass** will the EA place the pending order. The AI's original Take Profit is used as-is — no R:R auto-correction or rejection is applied.
 
 ### 💰 How Lot Size Is Calculated
 
@@ -439,28 +438,20 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 
 ---
 
-### 4. `MinRR` — Minimum Reward-to-Risk Ratio
+### 4. `MinRR` — Minimum Reward-to-Risk Ratio (Guidance Only)
 
 | | |
 |---|---|
 | **Type** | `double` (decimal number) |
 | **Default** | `1.5` |
 
-**What it does:** Sets the minimum acceptable reward-to-risk ratio for a trade. If the AI's suggested trade doesn't meet this threshold, the EA rejects it.
-
-**How it works internally:**
-- **Safety Filter 6** calculates the R:R as:
-  ```
-  R:R = |TP - entry| / |entry - SL|
-  ```
-- If the result is less than `MinRR`, the trade is rejected with `"REJECTED: R:R X < min Y"`.
-- This value is also passed to the AI in the system prompt as a constraint: `"TP must respect min R:R of {MinRR}"`, so the AI tries to design trades that meet this ratio from the start.
+**What it does:** This value is passed to the AI in the system prompt as a guideline: `"TP must respect min R:R of {MinRR}"`, so the AI tries to design trades that meet this ratio. However, the EA **no longer rejects or auto-corrects** trades based on R:R — the AI's original TP is always used as-is.
 
 **How to set it:**
-- **`1.0`:** You're accepting trades where the potential profit equals the potential loss. More signals but lower quality.
-- **`1.5`:** Target profit must be 1.5× the stop loss distance. Good balance of quality and quantity.
-- **`2.0`:** Only take trades where you stand to gain twice what you risk. Higher quality but fewer trades.
-- **`3.0+`:** Very selective — only the best setups pass. Very few trades.
+- **`1.0`:** Tells the AI to aim for trades where profit equals the risk.
+- **`1.5`:** Tells the AI to aim for 1.5× reward-to-risk (default).
+- **`2.0`:** Tells the AI to aim for 2× the stop loss distance.
+- **`3.0+`:** Tells the AI to be very selective with TP placement.
 
 ---
 
@@ -606,7 +597,7 @@ This means your actual risk may exceed `RiskPercent` — but it's the smallest t
 | `BackendURL` | string | `http://127.0.0.1:8000/signal` | Must match your server address |
 | `MaxSpreadPoints` | int | `50` | 0–∞; lower = safer |
 | `RiskPercent` | double | `1.0` | 0.1–100; typically 0.5–2.0 |
-| `MinRR` | double | `1.5` | 1.0–∞; higher = fewer but better trades |
+| `MinRR` | double | `1.5` | 1.0–∞; guidance for AI, no hard rejection |
 | `Timeframe` | enum | `M15` | M1, M5, M15, M30, H1, H4, D1, W1, MN1 |
 | `CandleCount` | int | `200` | 50–1000; AI only sees last 60 per TF |
 | `RefreshHours` | int | `4` | 1–24; controls signal frequency |
@@ -725,9 +716,9 @@ After you restart your computer, you need to start two things:
 3. Make sure the OpenAI model configured in `.env` is available on your account (default: `gpt-5.2`)
 4. Try restarting the server (Ctrl+C, then `python main.py`)
 
-### Problem: "REJECTED: R:R 1.02 < min 1.5"
-**What it means:** The AI suggested a trade, but the reward-to-risk ratio wasn't good enough.
-**How to fix:** This is the safety filter working correctly! The EA will request a new signal in 4 hours. If this happens frequently, you can lower `MinRR` (e.g., from 1.5 to 1.2), but a higher R:R is generally safer.
+### Problem: AI TP seems too close or too far
+**What it means:** The AI's take profit suggestion may not always match your expectations.
+**How to fix:** The EA now uses the AI's original TP as-is without rejection or auto-correction. Adjust the `MinRR` input to guide the AI toward your preferred reward-to-risk ratio — this value is passed to the AI prompt as guidance, but no hard rejection is applied.
 
 ---
 
