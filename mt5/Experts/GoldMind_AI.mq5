@@ -608,13 +608,9 @@ bool PlaceOrder(string orderType, double entry, double sl, double tp, int expiry
       return false;
      }
 
-//=== SAFETY FILTER 6: R:R check ===
+//=== INFO: R:R ratio (no rejection, using AI's original TP) ===
    double rr = (slDist > 0) ? tpDist / slDist : 0;
-   if(rr < InpMinRR)
-     {
-      Print(">>> REJECTED: R:R ", DoubleToString(rr, 2), " < min ", DoubleToString(InpMinRR, 2));
-      return false;
-     }
+   Print(">>> R:R ratio: ", DoubleToString(rr, 2), " (using AI's original TP)");
 
 //=== Calculate lot size based on risk ===
    double lots = CalculateLotSize(entry, sl);
