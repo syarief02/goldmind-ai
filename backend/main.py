@@ -157,6 +157,7 @@ class Constraints(BaseModel):
 
 
 class SignalRequest(BaseModel):
+    account_id: Optional[str] = None
     symbol: str = "XAUUSD"
     timeframe: str = "M15"
     server_time_utc: str = ""
@@ -475,6 +476,8 @@ async def generate_signal(req: SignalRequest):
     logger.info("")
     logger.info("─" * 60)
     logger.info(f"📥 [{now}] Signal request received")
+    if req.account_id:
+        logger.info(f"   Account: {req.account_id}")
     logger.info(f"   Symbol: {req.symbol}  Timeframe: {req.timeframe}")
     logger.info(f"   Bid: {req.bid}  Ask: {req.ask}  Spread: {req.spread_points}pts")
     # Log per-timeframe candle counts
