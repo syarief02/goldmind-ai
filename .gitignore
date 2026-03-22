@@ -23,12 +23,8 @@ Desktop.ini
 logs/
 
 # MT5 compiled
-<<<<<<< HEAD
-
-=======
 *.ex5
 
 # Ignore MQ source files
 *.mq4
 *.mq5
->>>>>>> 607bd79 (Add .mq4/.mq5 to gitignore - protect source code)
