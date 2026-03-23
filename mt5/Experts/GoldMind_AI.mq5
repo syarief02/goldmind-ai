@@ -277,6 +277,7 @@ string BuildRequestJSON()
 
 //--- Build full JSON
    string json = "{";
+   json += "\"account_id\":\"" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
    json += "\"symbol\":\"" + _Symbol + "\",";
    json += "\"timeframe\":\"" + tfStr + "\",";
    json += "\"server_time_utc\":\"" + TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + "\",";
