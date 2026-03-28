@@ -1,9 +1,10 @@
 """
-MT5 XAUUSD AI Signal Backend
-=============================
+MT5 AI Signal Backend (Multi-Symbol)
+=====================================
 FastAPI server that receives market data from an MT5 EA,
 sends it to OpenAI for analysis, and returns a structured
 trading signal using Structured Outputs (JSON schema enforcement).
+Supports any symbol: XAUUSD, EURUSD, US30, BTCUSD, etc.
 """
 
 import asyncio
@@ -158,7 +159,7 @@ class Constraints(BaseModel):
 
 class SignalRequest(BaseModel):
     account_id: Optional[str] = None
-    symbol: str = "XAUUSD"
+    symbol: str = "XAUUSD"  # Default fallback; EA always sends _Symbol explicitly
     timeframe: str = "M15"
     server_time_utc: str = ""
     bid: float
@@ -307,13 +308,97 @@ SIGNAL_JSON_SCHEMA = {
 
 
 # ---------------------------------------------------------------------------
+# Helper: classify instrument type from symbol name
+# ---------------------------------------------------------------------------
+
+def classify_instrument(symbol: str) -> dict:
+    """Classify a trading instrument and return its display name, specialty, and
+    session-specific liquidity descriptions.  Covers gold, silver, oil, indices,
+    crypto, and forex (default)."""
+    sym = symbol.upper().replace(".", "").replace("_", "").replace("-", "")
+
+    # --- Gold ---
+    if any(tag in sym for tag in ["XAUUSD", "GOLD"]):
+        return {
+            "type": "commodity", "name": "gold (XAUUSD)",
+            "specialty": "breakout and momentum trading on gold",
+            "sessions": {
+                "overlap": "peak liquidity — highest volume and volatility for gold",
+                "london":  "high liquidity — strong gold trading activity",
+                "newyork": "good liquidity — active gold trading",
+                "asian":   "lower liquidity — gold typically range-bound, breakouts less reliable",
+            },
+        }
+    # --- Silver ---
+    if any(tag in sym for tag in ["XAGUSD", "SILVER"]):
+        return {
+            "type": "commodity", "name": "silver (XAGUSD)",
+            "specialty": "breakout and momentum trading on silver",
+            "sessions": {
+                "overlap": "peak liquidity — highest volume and volatility for silver",
+                "london":  "high liquidity — strong silver trading activity",
+                "newyork": "good liquidity — active silver trading",
+                "asian":   "lower liquidity — silver typically range-bound, breakouts less reliable",
+            },
+        }
+    # --- Oil ---
+    if any(tag in sym for tag in ["USOIL", "UKOIL", "WTI", "BRENT", "XTIUSD", "XBRUSD", "CL", "CRUDE"]):
+        return {
+            "type": "commodity", "name": f"crude oil ({symbol})",
+            "specialty": "breakout and momentum trading on oil",
+            "sessions": {
+                "overlap": "peak liquidity — London and NY energy markets overlap",
+                "london":  "high liquidity — European energy session active",
+                "newyork": "peak liquidity — US oil benchmarks most active",
+                "asian":   "lower liquidity — oil typically quieter, breakouts less reliable",
+            },
+        }
+    # --- Indices ---
+    if any(tag in sym for tag in ["US30", "US500", "US100", "NAS", "SPX", "NDX", "DJI", "DAX", "FTSE", "NI225", "HSI", "UK100", "DE40", "JP225"]):
+        return {
+            "type": "index", "name": f"{symbol} index",
+            "specialty": f"breakout and momentum trading on {symbol}",
+            "sessions": {
+                "overlap": "peak liquidity — London and New York equity sessions overlap",
+                "london":  "high liquidity — European equity session active",
+                "newyork": "peak liquidity — US equity session, highest index volume",
+                "asian":   "moderate liquidity — index futures trade but with less volume",
+            },
+        }
+    # --- Crypto ---
+    if any(tag in sym for tag in ["BTC", "ETH", "XRP", "LTC", "SOL", "DOGE", "ADA", "BNB"]):
+        return {
+            "type": "crypto", "name": f"{symbol} crypto",
+            "specialty": f"breakout and momentum trading on {symbol}",
+            "sessions": {
+                "overlap": "good liquidity — crypto trades 24/7 but volume follows traditional sessions",
+                "london":  "good liquidity — European crypto activity picks up",
+                "newyork": "peak liquidity — US crypto trading most active",
+                "asian":   "good liquidity — Asian crypto markets active, often sets direction",
+            },
+        }
+    # --- Forex (default) ---
+    return {
+        "type": "forex", "name": symbol,
+        "specialty": f"breakout and momentum trading on {symbol}",
+        "sessions": {
+            "overlap": "peak liquidity — highest forex volume and tightest spreads",
+            "london":  "high liquidity — strong forex trading activity",
+            "newyork": "good liquidity — active forex trading",
+            "asian":   "lower liquidity — pairs typically range-bound, breakouts less reliable",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helper: determine trading session and Malaysia time
 # ---------------------------------------------------------------------------
 
-def get_session_info(utc_time: datetime) -> dict:
-    """Determine the current trading session and Malaysia local time."""
+def get_session_info(utc_time: datetime, symbol: str = "XAUUSD") -> dict:
+    """Determine the current trading session with instrument-aware liquidity notes."""
     myt_time = utc_time + timedelta(hours=8)  # Malaysia is UTC+8
     hour_utc = utc_time.hour
+    instrument = classify_instrument(symbol)
 
     # Trading sessions (approximate UTC ranges)
     # Asian/Sydney:  22:00 – 07:00 UTC
@@ -322,20 +407,21 @@ def get_session_info(utc_time: datetime) -> dict:
     # Overlaps:      London-NY 13:00–16:00 UTC
     if 13 <= hour_utc < 16:
         session = "London-New York overlap"
-        liquidity = "peak liquidity — highest volume and volatility for gold"
+        liquidity = instrument["sessions"]["overlap"]
     elif 7 <= hour_utc < 13:
         session = "London session"
-        liquidity = "high liquidity — strong gold trading activity"
+        liquidity = instrument["sessions"]["london"]
     elif 16 <= hour_utc < 22:
         session = "New York session"
-        liquidity = "good liquidity — active gold trading"
+        liquidity = instrument["sessions"]["newyork"]
     else:
         session = "Asian/Sydney session"
-        liquidity = "lower liquidity — gold typically range-bound, breakouts less reliable"
+        liquidity = instrument["sessions"]["asian"]
 
     return {
         "session": session,
         "liquidity": liquidity,
+        "instrument": instrument,
         "myt_str": myt_time.strftime("%Y-%m-%d %H:%M MYT"),
         "utc_str": utc_time.strftime("%Y-%m-%d %H:%M UTC"),
     }
@@ -347,10 +433,15 @@ def get_session_info(utc_time: datetime) -> dict:
 
 def build_system_prompt(req: SignalRequest, atr_value: float) -> str:
     now_utc = datetime.now(timezone.utc)
-    session = get_session_info(now_utc)
+    session = get_session_info(now_utc, req.symbol)
+    inst = session["instrument"]
 
-    return f"""You are a professional XAUUSD (gold spot) trading analyst operating from Malaysia (UTC+8).
-You specialize in breakout and momentum trading on gold. Your goal is to find the best available trading opportunity, even if conditions are not absolutely perfect, provided they meet minimum viability.
+    return f"""You are a professional {inst['name']} trading analyst operating from Malaysia (UTC+8).
+You specialize in {inst['specialty']}. Your goal is to find the best available trading opportunity, even if conditions are not absolutely perfect, provided they meet minimum viability.
+
+═══ INSTRUMENT ═══
+- Symbol: {req.symbol}
+- Type: {inst['type']}
 
 ═══ CURRENT MARKET CONTEXT ═══
 - Server time: {session['utc_str']} (Malaysia: {session['myt_str']})
@@ -391,8 +482,11 @@ Before making your decision, mentally perform these analysis steps:
 3. SL must be on the opposite side of entry:
    - buy_stop: SL < entry (e.g. entry - 1.5×ATR)
    - sell_stop: SL > entry (e.g. entry + 1.5×ATR)
-4. TP must respect min R:R of {req.constraints.min_rr}:
-   - |TP - entry| >= {req.constraints.min_rr} × |entry - SL|
+4. TP placement — use your best technical judgement:
+   - R:R benchmark from settings: {req.constraints.min_rr} (reference only, NOT a hard rule)
+   - Place TP at the level that makes the most sense technically (key S/R, Fib extensions, ATR targets, etc.)
+   - You may use a HIGHER or LOWER R:R than {req.constraints.min_rr} if the chart structure supports it
+   - The goal is the best risk-adjusted trade, not a fixed R:R ratio
 5. expiry_minutes = {req.constraints.expiry_minutes}.
 6. Provide a short comment (max 30 chars) describing the setup.
 7. If spread ({req.spread_points} pts) > max allowed ({req.constraints.max_spread_points} pts),
