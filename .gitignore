@@ -22,8 +22,7 @@ Desktop.ini
 # Logs
 logs/
 
-# MT5 compiled
-*.ex5
+
 
 # Ignore MQ source files
 *.mq4
