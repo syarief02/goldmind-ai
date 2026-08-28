@@ -794,6 +794,7 @@ To get permanent authorization on live accounts, register an account (Cent accou
 
 | Broker | Partner Link | Partner / IB ID | Support Email |
 |---|---|---|---|
+| **FISG** | [Register with FISG](https://my.fisg.com/u/CTt0Rd) | `CTt0Rd` | `support@fisg.com` |
 | **CXM Direct** | [Register with CXM Direct](https://gocxm.co/links/go/5062) | `5062` | `clients@cxmdirect.com` |
 | **FBS** | [Register with FBS](https://fbs.partners?ibl=154319&ibp=588292) | `588292` | `support@fbs.com` |
 | **Markets4you** | [Register with Markets4you](https://account.markets4you.online/en/user-registration/?affid=4hcnvz4) | `4hcnvz4` | `support@markets4you.com` |
