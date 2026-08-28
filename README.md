@@ -19,6 +19,7 @@
 11. [How to Restart Everything](#-how-to-restart-everything-after-pc-reboot)
 12. [Troubleshooting Common Problems](#-troubleshooting-common-problems)
 13. [Frequently Asked Questions](#-frequently-asked-questions)
+14. [Authorization & Licensing](#-authorization--licensing)
 
 ---
 
@@ -321,7 +322,7 @@ Look at the top toolbar of MT5. You should see a button that says **"Algo Tradin
 2. You should see messages like:
 
 ```
-License valid until: 2026.03.31 23:59
+License valid until: 2026.09.30 23:55
 === GoldMind AI initialized ===
 Backend URL: http://127.0.0.1:8000/signal
 >>> No pending order found, requesting new signal...
@@ -770,10 +771,40 @@ goldmind-ai/
 │   ├── Include/
 │   │   └── JASONNode.mqh           ← JSON parser library (→ MQL5\Include\)
 │   └── Experts/
-│       └── GoldMind_AI.mq5         ← The Expert Advisor (→ MQL5\Experts\)
-├── .gitignore                      ← Prevents .env from being uploaded
+│       └── GoldMind AI v1.00 - MT5 - 20260930.ex5 ← Compiled Expert Advisor (→ MQL5\Experts\)
+├── .gitignore                      ← Prevents .env & source files from being uploaded
 └── README.md                       ← This documentation
 ```
+
+---
+
+## 🔐 Authorization & Licensing
+
+GoldMind AI includes a built-in authorization and trial licensing system:
+
+### 1. Account Types & Access Rules
+- **🧪 Demo Accounts:** Always 100% free and unlocked. No registration or authorization required.
+- **✅ Authorized Live Accounts:** Permanent access for accounts registered through our official partner broker links.
+- **⏳ Trial Mode:** Unregistered live accounts can trade until the expiration date (**2026-09-30**).
+- **❌ Expired Mode:** After the expiration date, unregistered accounts will display a notice and the EA will safely remove itself.
+
+### 2. Partner Broker Registration Links
+
+To get permanent authorization on live accounts, register an account (Cent accounts recommended for balances under $1,000, maximum leverage, minimum $100 USD deposit) using our partner links:
+
+| Broker | Partner Link | Partner / IB ID | Support Email |
+|---|---|---|---|
+| **CXM Direct** | [Register with CXM Direct](https://gocxm.co/links/go/5062) | `5062` | `clients@cxmdirect.com` |
+| **FBS** | [Register with FBS](https://fbs.partners?ibl=154319&ibp=588292) | `588292` | `support@fbs.com` |
+| **Markets4you** | [Register with Markets4you](https://account.markets4you.online/en/user-registration/?affid=4hcnvz4) | `4hcnvz4` | `support@markets4you.com` |
+| **InstaForex** | [Register with InstaForex](https://www.instaforex.com?x=KUSD) | `KUSD` | `support@instaforex.com` |
+| **LiteFinance** | [Register with LiteFinance](https://www.litefinance.com/?uid=805161060) | `805161060` | `clients@litefinance.com` |
+| **RoboForex** | [Register with RoboForex](https://my.roboforex.com/en/?a=mxyg) | `mxyg` | `support@roboforex.com` |
+| **XM** | [Register with XM](https://clicks.pipaffiliates.com/c?c=862266&l=en&p=1) | `A1202120` | `support@xm.com` |
+| **Valetax** | [Register with Valetax](https://ma.valetax.com/partner/IB1939088) | `IB1939088` | `support@valetax.com` |
+| **Tickmill** | [Register with Tickmill](https://tickmill.link/46cOQ2h) | `IB72324388` | `support@tickmill.com` |
+
+> 💬 **After Registering:** Send your trading account number to [@SyariefAzman on Telegram](https://t.me/SyariefAzman) or WhatsApp (+60194961568) to receive authorized build updates.
 
 ---
 
