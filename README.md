@@ -802,7 +802,7 @@ To get permanent authorization on live accounts, register an account (Cent accou
 | **LiteFinance** | [Register with LiteFinance](https://www.litefinance.com/?uid=805161060) | `805161060` | `clients@litefinance.com` |
 | **RoboForex** | [Register with RoboForex](https://my.roboforex.com/en/?a=mxyg) | `mxyg` | `support@roboforex.com` |
 | **XM** | [Register with XM](https://clicks.pipaffiliates.com/c?c=862266&l=en&p=1) | `A1202120` | `support@xm.com` |
-| **Valetax** | [Register with Valetax](https://ma.valetax.com/partner/IB1939088) | `IB1939088` | `support@valetax.com` |
+| **Valetax** | [Register with Valetax](https://ma.valetax.com/p/1939088) | `1939088` | `support@valetax.com` |
 | **Tickmill** | [Register with Tickmill](https://tickmill.link/46cOQ2h) | `IB72324388` | `support@tickmill.com` |
 
 > 💬 **After Registering:** Send your trading account number to [@SyariefAzman on Telegram](https://t.me/SyariefAzman) or WhatsApp (+60194961568) to receive authorized build updates.
