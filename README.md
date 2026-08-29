@@ -804,6 +804,7 @@ To get permanent authorization on live accounts, register an account (Cent accou
 | **XM** | [Register with XM](https://clicks.pipaffiliates.com/c?c=862266&l=en&p=1) | `A1202120` | `support@xm.com` |
 | **Valetax** | [Register with Valetax](https://ma.valetax.com/p/1939088) | `1939088` | `support@valetax.com` |
 | **Tickmill** | [Register with Tickmill](https://tickmill.link/46cOQ2h) | `IB72324388` | `support@tickmill.com` |
+| **HF Markets** | [Register with HF Markets](https://www.hfmmalaysia.com/sv/en/?refid=30572923) | `30572923` | `support@hfm.com` |
 
 > 💬 **After Registering:** Send your trading account number to [@SyariefAzman on Telegram](https://t.me/SyariefAzman) or WhatsApp (+60194961568) to receive authorized build updates.
 
